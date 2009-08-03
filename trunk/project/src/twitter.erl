@@ -24,6 +24,10 @@
 		 rpc/1
 		]).
 
+-export([
+		 update_status/3
+		 ]).
+
 %%
 %% API Functions
 %%
@@ -41,6 +45,11 @@ stop() ->
 %%
 ping() ->
 	rpc(ping).
+
+
+update_status(Username, Password, Status) ->
+	rpc({update_status, Username, Password, Status}).
+
 
 rpc(Q) ->
 	%%io:format("twitteradmin: rpc(~p)~n", [Q]),
@@ -65,9 +74,8 @@ start_link(Args) ->
 	
 	Pid = spawn_link(?MODULE, loop, [Args]),
 	register(?MODULE, Pid),
-	
 	io:format("~p daemon started, pid[~p]~n", [?MODULE, Pid]),
-	
+	inets:start(),
 	{ok, Pid}.
 
 
@@ -78,8 +86,11 @@ loop(Args) ->
 			exit(ok);
 	
 		{From, ping} ->
-			From ! {twitter, {pong, self()}}
+			From ! {twitter, {pong, self()}};
 		
+		{From, {update_status, Username, Password, Status}} ->
+			twitter_api:update_status({From, Return}, Username, Password, Status)
+	
 	end,
 	loop(Args).
 
