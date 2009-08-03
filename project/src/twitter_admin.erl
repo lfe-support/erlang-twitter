@@ -49,7 +49,7 @@ stop(Code) ->
 run(Command) ->
 	
 	%% Register ourselves as message switch
-	Pid = spawn_link(?MODULE, loop, []),
+	Pid = spawn(?MODULE, loop, []),
 	register(?MODULE, Pid),
 	
 	?MODULE ! {run, Command},
@@ -62,7 +62,7 @@ loop() ->
 			exit(ok);
 		
 		{stop, Code} ->
-			exit(Code);
+			halt(Code);
 		
 		{run, Command} ->
 			handleCommand(Command)
@@ -81,7 +81,7 @@ handleCommand(undefined) ->
 
 
 handleCommand(check) ->
-	Running=tools:is_running(),
+	Running=tools:is_running(twitter),
 	case Running of
 		true ->
 			io:format("daemon not found~n"),
@@ -93,13 +93,13 @@ handleCommand(check) ->
 	end.
 
 
-%% TODO make this more robust
+%% Test if daemon is running locally
+%%
+%% @TODO make this more robust
 do_ping() ->
-	Host=tools:extract_host(node()),
-	Twitter=string:concat("twitter@", Host),
-	AT=erlang:list_to_atom(Twitter),
-	%%io:format("node: ~p~n",[AT]),
-	case rpc:call(AT, twitter, ping, [], 2000) of
+	Node=tools:make_node(twitter),
+	%%io:format("node: ~p~n",[Node]),
+	case rpc:call(Node, twitter, ping, [], 2000) of
 		{badrpc, Reason} ->
 			io:format("daemon communication error [~p]~n", [Reason]),
 			stop(?DAEMON_COMM_ERROR);
