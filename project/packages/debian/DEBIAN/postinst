@@ -1,0 +1,136 @@
+#!/usr/bin/env python
+"""
+	@author: Jean-Lou Dupont
+	
+	from: http://www.debian.org/doc/debian-policy/ch-maintainerscripts.html
+	Cases:
+	
+		postinst configure most-recently-configured-version
+	
+		old-postinst abort-upgrade new-version
+		
+		conflictor's-postinst abort-remove in-favour package new-version
+		
+		postinst abort-remove
+		
+		deconfigured's-postinst abort-deconfigure in-favour failed-install-package version [removing conflicting-package version]
+		
+		
+	Policy 10.7.3
+	
+		A common practice is to create a script called package-configure and have the package's postinst call it 
+		if and only if the configuration file does not already exist. 
+		In certain cases it is useful for there to be an example or template file which the maintainer scripts use. 
+		Such files should be in /usr/share/package or /usr/lib/package (depending on whether they are architecture-independent or not). 
+		There should be symbolic links to them from /usr/share/doc/package/examples if they are examples, 
+		and should be perfectly ordinary dpkg-handled files (not configuration files).
+
+"""
+
+import os
+import sys
+
+this_lib     = "pem"
+this_version = "$version"
+
+command = sys.argv[1]
+version = sys.argv[2]
+cwd     = os.getcwd()
+
+print "%s: postinst: command[%s] configured version [%s] this version[%s]" % (this_lib, command, version, this_version)
+
+"""
+	Libraries:
+	==========
+	
+	libpem_common_debug.so
+	libpem_common.so
+	
+	Executables:
+	============
+	pem_drv_mng_debug
+	pem_drv_mng
+	
+	pem_drv_ifk_debug
+	pem_drv_ifk
+	
+"""
+
+libs  = ['/usr/lib/libpem_common%s.so',]
+execs = [	'/usr/bin/pem_drv_mng%s', 
+			'/usr/bin/pem_drv_ifk%s'
+		]
+
+all = libs + execs
+
+"""
+	1- remove currently configured version
+	2- add symlinks
+	3- perform chmod's
+"""
+
+if command == 'configure':
+
+	
+	for one in all:
+		#configured version
+		cv  = one % ("-%s"       % version)
+		cvd = one % ("_debug-%s" % version)
+		
+		#new version
+		nv  = one % ("-%s"       % this_version)
+		nvd = one % ("_debug-%s" % this_version)
+
+		#base ie. symlinks
+		b   = one % ""
+		bd  = one % "_debug"
+		
+		#remove current version
+		# **ONLY** if it is not the version we are trying to install ;-)
+		if version != this_version:
+			try:	
+				os.remove(cv)
+				print "%s: removed [%s]" % (this_lib, cv)
+			except:
+				print "%s: not found[%s]" % (this_lib, cv)
+				pass
+			
+			try:	
+				os.remove(cvd)
+				print "%s: removed [%s]" % (this_lib, cvd)
+			except:
+				print "%s: not found[%s]" % (this_lib, cvd)	
+				pass
+
+		#remove symlinks
+		try:	
+			os.remove(b)
+			print "%s: removed [%s]" % (this_lib, b)
+			os.remove(bd)
+			print "%s: removed [%s]" % (this_lib, bd)
+		except: pass
+
+		code = 0
+		try:
+			#creating symlinks
+			
+			os.symlink( nv,  b)
+			print "%s: created symlink, src[%s] => dst[%s]" % (this_lib, nv, b)
+			
+			os.symlink( nvd, bd)
+			print "%s: created symlink, src[%s] => dst[%s]" % (this_lib, nvd, bd)
+
+			os.chmod(nv,  0700)
+			os.chmod(nvd, 0700)
+			os.chmod(b,   0700)
+			os.chmod(bd,  0700)
+			
+		except Exception,e:
+			print "Exception [%s]" % e
+			code = 1
+	
+	os.system("ldconfig")
+	sys.exit( code )
+	
+
+## TODO EPEM:  create /var/log/pem directory for sasl
