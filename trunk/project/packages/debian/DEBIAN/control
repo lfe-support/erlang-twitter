@@ -1,0 +1,11 @@
+Package: pem
+Version: $version
+Priority: optional
+Architecture: i386
+Depends: mysql-server (>=5.0), python (>=2.5), libmyodbc (>=3.51)
+Section: Other
+Maintainer: Jean-Lou Dupont <pem@jldupont.com>
+Description: Erlang Port drivers for Phidgets
+ PEM is a collection of librairies & executables for interfacing
+ Phidget devices (http://www.phidgets.com/) to Erlang.
+ .

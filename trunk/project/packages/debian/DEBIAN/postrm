@@ -1,0 +1,77 @@
+#!/usr/bin/env python
+
+"""
+	@author: Jean-Lou Dupont
+	
+	from: http://www.debian.org/doc/debian-policy/ch-maintainerscripts.html
+	Cases:
+	
+		postrm remove
+
+		postrm purge
+		
+		old-postrm upgrade new-version
+		
+		new-postrm failed-upgrade old-version
+		
+		new-postrm abort-install
+		
+		new-postrm abort-install old-version
+		
+		new-postrm abort-upgrade old-version	
+		
+		disappearer's-postrm disappear overwriter overwriter-version
+		
+
+	Policy 10.6
+		Packages must not remove any device files in the postrm or any other script. This is left to the system administrator.
+		
+	Policy 10.8
+		Log files should be removed when the package is purged (but not when it is only removed). 	
+		
+	
+"""
+
+import os
+import sys
+import glob
+
+this_lib     = "pem"
+this_version = "$version"
+
+try:    command = sys.argv[1]
+except: command =''
+
+try:    version = sys.argv[2]
+except: version = ''
+
+print "%s: postrm: cmd[%s] version[%s]" % (this_lib, command, version)
+
+libs  = ['/usr/lib/libpem_common%s.so',]
+execs = [	'/usr/bin/pem_drv_mng%s', 
+			'/usr/bin/pem_drv_ifk%s'
+		]
+
+all = libs+execs
+
+try:
+
+	# handle 'PURGE' and 'remove' commands
+	# ====================================
+	if (command == 'remove') or (command == 'purge'):
+	
+		files=[]
+		try:
+			for one in all:
+				files.extend( glob.glob( one % "*" ) )
+			
+			for file in files:
+				os.remove( file )
+				print "%s: removed [%s]" % (this_lib, file)
+		except:
+			pass
+	
+except:
+	pass
+
+sys.exit(0)
