@@ -32,8 +32,8 @@ start_link(Args) ->
 %% --------------------------------------------------------------------
 init(Args) ->
 	
-    Twitter = {twitter,{twitter,start_link,[Args]},
-	      permanent,2000,worker,[twitter]},
+    Twitter = {twitter_app,{twitter_app,start_link,[Args]},
+	      permanent,2000,worker,[twitter_app]},
 	
     {ok,{{one_for_one,5,1}, [
 							 Twitter 
