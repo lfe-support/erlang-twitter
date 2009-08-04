@@ -37,7 +37,9 @@
 		 
 		 encode_tuple/2,
 		 
-		 format_encoded_list/1
+		 format_encoded_list/1,
+		 
+		 extract/2
 		 ]).
 
 %%
@@ -270,3 +272,29 @@ force_list(Key) when is_atom(Key) ->
 
 force_list(Key) ->
 	Key.
+
+
+		%% Result = {{HttpVersion, HttpCode, HttpResponseCode}, [Headers], ResponseBody}
+		%% HttpVersion = string()         (eg. "HTTP/1.1")
+		%% HttpCode = integer()           (eg. "200")
+		%% HttpResponseCode = string()    (eg. "OK")
+		%% Headers = {key, value}, {key, value} ...
+		%% ResponseBody = string()
+
+
+extract(Result, headers) ->
+	{{_Version, _Code, _CodeText}, Headers, _Body} = Result,
+	Headers;
+
+extract(Result, body) ->
+	{{_Version, _Code, _CodeText}, _Headers, Body} = Result,
+	Body;
+
+extract(Result, http.code) ->
+	{{_Version, Code, _CodeText}, _Headers, _Body} = Result,
+	Code;
+
+extract(Result, http.code.text) ->
+	{{_Version, _Code, CodeText}, _Headers, _Body} = Result,
+	CodeText.
+	

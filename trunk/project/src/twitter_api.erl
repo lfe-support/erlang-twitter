@@ -3,6 +3,10 @@
 %% Description: Twitter API
 %%
 %% Support for additional methods can be easily added.
+%%
+%% Use tools:extract to retrieve a specific field
+%%  of the result-set returned by twitter_api:request
+%%
 
 -module(twitter_api).
 
