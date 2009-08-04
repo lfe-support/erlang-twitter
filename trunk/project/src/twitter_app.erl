@@ -7,7 +7,7 @@
 %%
 %% Include files
 %%
--include("twitter.hrl").
+-include("../include/twitter.hrl").
 
 %%
 %% Exported Functions
@@ -15,22 +15,13 @@
 -export([
 		 start/0,
 		 start_link/0,
-		 start_link/1,
-		 
-		 stop/0
+		 start_link/1
 		 ]).
 
 -export([
 		 loop/1,
 		 rpc/1
 		]).
-
--export([
-		 request/1,  %% only  Method
-		 request/2,  %%       Method, Params
-		 request/3,  %% Auth, Method, Params
-		 request/4   %% Auth, Method, Params, [optional params]
-		 ]).
 
 %%
 %% API Functions
@@ -41,15 +32,10 @@ start() ->
 start_link() ->
 	start_link([]).
 
-stop() ->
-	?MODULE ! stop.
-
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%                     API
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
- 
 request(Method) ->
 	rpc({request, {auth, undefined, undefined}, Method, [], []}).
 
@@ -63,8 +49,12 @@ request({auth, Username, Password}, Method, Params, OpParams) ->
 	rpc({request, {auth, Username, Password}, Method, Params, OpParams}).
 
 %% Management
+pong() ->
+	io:format("twitter_app:pong~n"),
+	rpc(pong).
+	
 ping() ->
-	io:format("twitter:ping~n"),
+	io:format("twitter_app:ping~n"),
 	rpc(ping).
 
 
@@ -74,8 +64,8 @@ ping() ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 rpc(Q) ->
-	io:format("twitter: rpc(~p)~n", [Q]),
-	?MODULE ! {self(), Q},
+	io:format("twitter_app: rpc(~p)~n", [Q]),
+	twitter ! {self(), Q},
 	receive
 		{twitter, Reply} ->
 			Reply;
@@ -86,6 +76,7 @@ rpc(Q) ->
 	
 	after 2000 ->
 			
+			io:format("~p: rpc timeout~n",[?MODULE]),
 			rpcerror
 	end.
 
@@ -94,9 +85,8 @@ rpc(Q) ->
 %% Local Functions
 %%
 start_link(Args) ->
-	
 	Pid = spawn_link(?MODULE, loop, [Args]),
-	register(?MODULE, Pid),
+	register(twitter, Pid),
 	io:format("~p daemon started, pid[~p]~n", [?MODULE, Pid]),
 	inets:start(),
 	{ok, Pid}.
@@ -105,16 +95,18 @@ start_link(Args) ->
 
 loop(Args) ->
 	receive
-		stop ->
-			exit(ok);
-	
+		
 		%% daemon management related
+		{From, pong} ->
+			io:format("twitter: received 'pong' from [~p]~n", [From]),
+			From ! {twitter, {ping, os:getpid()}};
+			
 		{From, ping} ->
-			From ! {twitter, {pong, self()}};
+			io:format("twitter: received 'ping' from [~p]~n", [From]),
+			From ! {twitter, {pong, os:getpid()}};
 		
 		{From, {request, Auth, Method, Params, OpParams}} ->
 			twitter_api:request({From, twitter}, Auth, Method, Params, OpParams)
 	
 	end,
 	loop(Args).
-
