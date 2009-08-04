@@ -25,14 +25,19 @@
 %%
 %% API Functions
 %%
-start() ->
-	io:format("usage: twitter_admin [check]~n").
+start() -> run(check).
 
-start(["check"]) ->
-	run(check);
+start(ping) -> run(ping);
 
-start([check]) ->
-	run(check);
+start(["ping"]) ->	run(ping);
+
+start([ping]) ->   run(ping);
+
+start(stop) ->	 run(stop);
+
+start([stop]) -> run(stop);
+
+start(["stop"]) ->	run(stop);
 
 start(Other) ->
 	io:format("invalid command [~p]~n", [Other]).
@@ -79,8 +84,24 @@ loop() ->
 handleCommand(undefined) ->
 	?MODULE ! {stop, undefined_command};
 
+handleCommand(stop) ->
+	Node=tools:make_node(twitter),
+	io:format("twitteradmin: node: ~p~n",[Node]),
+	case rpc:call(Node, twitter_app, stop, [], 2000) of
+		{badrpc, Reason} ->
+			io:format("daemon communication error [~p]~n", [Reason]),
+			stop(?DAEMON_COMM_ERROR);
+		
+		{pong, _Pid} ->
+			io:format("daemon found~n"),
+			stop(?DAEMON_FOUND);
+	
+		Other ->
+			io:format("twitteradmin: received [~p]~n", [Other])
+	end;
+	
 
-handleCommand(check) ->
+handleCommand(ping) ->
 	Running=tools:is_running(twitter),
 	case Running of
 		true ->
@@ -98,8 +119,8 @@ handleCommand(check) ->
 %% @TODO make this more robust
 do_ping() ->
 	Node=tools:make_node(twitter),
-	%%io:format("node: ~p~n",[Node]),
-	case rpc:call(Node, twitter, ping, [], 2000) of
+	io:format("twitteradmin: node: ~p~n",[Node]),
+	case rpc:call(Node, twitter_app, ping, [], 2000) of
 		{badrpc, Reason} ->
 			io:format("daemon communication error [~p]~n", [Reason]),
 			stop(?DAEMON_COMM_ERROR);

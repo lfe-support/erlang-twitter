@@ -2,7 +2,7 @@
 %% Created: 2009-08-03
 %% Description: Twitter daemon
 %%
--module(twitter).
+-module(twitter_app).
 
 %%
 %% Include files
@@ -64,6 +64,7 @@ request({auth, Username, Password}, Method, Params, OpParams) ->
 
 %% Management
 ping() ->
+	io:format("twitter:ping~n"),
 	rpc(ping).
 
 
@@ -73,8 +74,8 @@ ping() ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 rpc(Q) ->
-	%%io:format("twitteradmin: rpc(~p)~n", [Q]),
-	twitter ! {self(), Q},
+	io:format("twitter: rpc(~p)~n", [Q]),
+	?MODULE ! {self(), Q},
 	receive
 		{twitter, Reply} ->
 			Reply;
