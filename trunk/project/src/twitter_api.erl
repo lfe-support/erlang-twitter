@@ -47,7 +47,7 @@ test_update() ->
 	inets:start(),
 	Username=os:getenv("twitter_username"),
 	Password=os:getenv("twitter_password"),
-	Param=os:getenv("twitter_param"),
+	Param=os:getenv("twitter_param2"),
 	request(undefined, {auth, Username, Password}, statuses.update, {status, Param}),
 	ok.
 	
@@ -71,7 +71,7 @@ request(Rd, Auth, statuses.user_timeline, Params) ->
 request(Rd, Auth, statuses.update, {status, Status}) ->
 	Req="statuses/update.xml",
 	EncodedBody=tools:encode_tuple("status", Status),
-	do_auth_request(Rd, post, Req, Auth, "text/plain", EncodedBody);
+	do_auth_request(Rd, post, Req, Auth, "application/x-www-form-urlencoded", EncodedBody);
 
 
 %% Catch-all
@@ -121,6 +121,7 @@ do_request(Type, ReturnDetails, Req, Auth) ->
 
 do_request(Type, ReturnDetails, Req, Auth, ContentType, Body) ->
 	CompleteReq=?API++Req,
+	io:format("body [~p]~n", [Body]),
 	Ret = http:request(Type, {CompleteReq, [{"Authorization", Auth}], ContentType, Body}, [], [{sync, false}]),
 	case Ret of
 
