@@ -33,11 +33,13 @@ start(["ping"]) ->	run(ping);
 
 start([ping]) ->   run(ping);
 
-start(stop) ->	 run(stop);
+start(dostop) ->	 run(dostop);
 
-start([stop]) -> run(stop);
+start([dostop]) -> run(dostop);
 
-start(["stop"]) ->	run(stop);
+start(["dostop"]) ->	run(dostop);
+
+start(Command) -> run(Command);
 
 start(Other) ->
 	io:format("invalid command [~p]~n", [Other]).
@@ -84,53 +86,59 @@ loop() ->
 handleCommand(undefined) ->
 	?MODULE ! {stop, undefined_command};
 
-handleCommand(stop) ->
-	Node=tools:make_node(twitter),
-	io:format("twitteradmin: node: ~p~n",[Node]),
-	case rpc:call(Node, twitter_app, stop, [], 2000) of
-		{badrpc, Reason} ->
-			io:format("daemon communication error [~p]~n", [Reason]),
+handleCommand(dostop) ->
+	case dorpc(dostop) of
+		
+		rpcerror ->
 			stop(?DAEMON_COMM_ERROR);
 		
-		{pong, _Pid} ->
-			io:format("daemon found~n"),
-			stop(?DAEMON_FOUND);
-	
 		Other ->
 			io:format("twitteradmin: received [~p]~n", [Other])
 	end;
 	
 
 handleCommand(ping) ->
-	Running=tools:is_running(twitter),
-	case Running of
-		true ->
-			io:format("daemon not found~n"),
-			stop(?DAEMON_NOT_FOUND);
-	
-		%% Try pinging the daemon
-		false ->
-			do_ping()
-	end.
-
-
-%% Test if daemon is running locally
-%%
-%% @TODO make this more robust
-do_ping() ->
-	Node=tools:make_node(twitter),
-	io:format("twitteradmin: node: ~p~n",[Node]),
-	case rpc:call(Node, twitter_app, ping, [], 2000) of
-		{badrpc, Reason} ->
-			io:format("daemon communication error [~p]~n", [Reason]),
+	case dorpc(ping) of 
+		rpcerror ->
 			stop(?DAEMON_COMM_ERROR);
-		
-		{pong, _Pid} ->
-			io:format("daemon found~n"),
+	
+		{pong, Pid} ->
+			io:format("daemon found, pid[~p]~n", [Pid]),
 			stop(?DAEMON_FOUND);
 	
 		Other ->
-			io:format("twitteradmin: received [~p]~n", [Other])
+			io:format("communication protocol error [~p]~n", [Other]),
+			stop(?DAEMON_PROTOCOL_ERROR)
+	
+	end;
+
+
+
+handleCommand(pong) ->
+	case dorpc(pong) of 
+		rpcerror ->
+			stop(?DAEMON_COMM_ERROR);
+	
+		{ping, Pid} ->
+			io:format("daemon found, pid[~p]~n", [Pid]),
+			stop(?DAEMON_FOUND);
+	
+		Other ->
+			io:format("communication protocol error [~p]~n", [Other]),
+			stop(?DAEMON_PROTOCOL_ERROR)
 	end.
 
 
+dorpc(Message) ->
+	Node=tools:make_node(twitter),
+
+	case rpc:call(Node, twitter_app, Message, [], 4000) of
+		{badrpc, Reason} ->
+			io:format("daemon communication error [~p]~n", [Reason]),
+			rpcerror;
+		
+		Other ->
+			io:format("twitteradmin:dorpc: received [~p]~n", [Other]),
+			Other
+	end.
+	
