@@ -16,7 +16,9 @@
 		 extract_host/1,
 		 make_node/1,
 		 make_node/2,
-		 to_string/1
+		 to_string/1,
+		 kfind/2,
+		 kfind/3
 		 ]).
 
 -export([
@@ -80,6 +82,7 @@ to_string(StringTerm) ->
 	
 	
 
+
 gen_auth_header(Username, Password) ->
 	"Basic "++gen_auth(Username, Password).
 	
@@ -89,7 +92,7 @@ gen_auth(Username, Password) ->
 	
 	
 
-
+%% From YAWS
 url_encode([H|T]) ->
     if
         H >= $a, $z >= H ->
@@ -113,6 +116,7 @@ url_encode([]) ->
     [].
 
 
+%% From YAWS
 integer_to_hex(I) ->
     case catch erlang:integer_to_list(I, 16) of
         {'EXIT', _} ->
@@ -120,7 +124,6 @@ integer_to_hex(I) ->
         Int ->
             Int
     end.
-
 
 old_integer_to_hex(I) when I<10 ->
     integer_to_list(I);
@@ -131,6 +134,7 @@ old_integer_to_hex(I) when I<16 ->
 old_integer_to_hex(I) when I>=16 ->
     N = trunc(I/16),
     old_integer_to_hex(N) ++ old_integer_to_hex(I rem 16).
+
 
 
 %% from yaws_api
@@ -190,13 +194,15 @@ encode_list([]) ->
 	"";
 
 encode_list([{Key, Value}]) ->
-	url_encode(Key) ++ "=" ++ url_encode(Value);
+	LKey=force_list(Key),
+	url_encode(LKey) ++ "=" ++ url_encode(Value);
 	
 encode_list([H]) ->
 	url_encode(H);
 
 encode_list([{Key, Value}|T]) ->
-	url_encode(Key)++"="++url_encode(Value)++"&"++ encode_list(T);
+	LKey=force_list(Key),
+	url_encode(LKey)++"="++url_encode(Value)++"&"++ encode_list(T);
 
 encode_list([H|T]) ->
 	url_encode(H) ++ "&" ++ encode_list(T);
@@ -205,8 +211,12 @@ encode_list(E) ->
 	url_encode(E).
 
 
+
 encode_tuple(Key, Value) ->
-	url_encode(Key)++"="++url_encode(Value).
+	LKey=force_list(Key),
+	url_encode(LKey)++"="++url_encode(Value).
+
+
 
 format_encoded_list("") ->
 	"";
@@ -214,3 +224,49 @@ format_encoded_list("") ->
 format_encoded_list(Liste) ->
 	"?"++Liste.
 
+
+
+kfind(_Key, []) ->
+	{};
+
+%% Searches through a list for a Key
+%% Returns {} if not found or {Key, Value} otherwise
+kfind(Key, List) ->
+	case erlang:is_builtin(lists, keyfind, 3) of
+		true  ->
+			case lists:keyfind(Key,1,List) of
+				false ->
+					{};
+				Tuple ->
+					Tuple
+			end;
+
+		false ->
+			case lists:keysearch(Key,1,List) of
+				{value, Value} ->
+					Value;
+				_ ->
+					{}
+			end
+	end.
+
+%% Returns {Key, Default} if not found or {Key, Value} otherwise
+kfind(Key, [], Default) ->
+	{Key, Default};
+
+kfind(Key, List, Default) ->
+	Ret=base:kfind(Key, List),
+	case Ret of
+		false ->
+			{Key, Default};
+		{Key, Value} ->
+			{Key, Value}
+	end.
+
+
+
+force_list(Key) when is_atom(Key) ->
+	erlang:atom_to_list(Key);
+
+force_list(Key) ->
+	Key.
