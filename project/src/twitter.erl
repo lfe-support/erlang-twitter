@@ -25,7 +25,10 @@
 		]).
 
 -export([
-		 request/3
+		 request/1,  %% only  Method
+		 request/2,  %%       Method, Params
+		 request/3,  %% Auth, Method, Params
+		 request/4   %% Auth, Method, Params, [optional params]
 		 ]).
 
 %%
@@ -40,15 +43,33 @@ start_link() ->
 stop() ->
 	?MODULE ! stop.
 
-%%
-%% RPC functions
-%%
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%                     API
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+ 
+request(Method) ->
+	rpc({request, {auth, undefined, undefined}, Method, [], []}).
+
+request(Method, Params) ->
+	rpc({request, {auth, undefined, undefined}, Method, Params, []}).
+
+request({auth, Username, Password}, Method, Params) ->
+	rpc({request, {auth, Username, Password}, Method, Params, []}).
+  
+request({auth, Username, Password}, Method, Params, OpParams) ->
+	rpc({request, {auth, Username, Password}, Method, Params, OpParams}).
+
+%% Management
 ping() ->
 	rpc(ping).
 
-request({auth, Username, Password}, Method, Params) ->
-	rpc({request, {auth, Username, Password}, Method, Params}).
-  
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%                     LOCAL
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 rpc(Q) ->
 	%%io:format("twitteradmin: rpc(~p)~n", [Q]),
@@ -58,11 +79,12 @@ rpc(Q) ->
 			Reply;
 	
 		Other ->
-			error_logger:error_msg("~p rpc: received [~p]~n", [?MODULE, Other])
+			error_logger:error_msg("~p rpc: received [~p]~n", [?MODULE, Other]),
+			rpcerror
 	
 	after 2000 ->
+			
 			rpcerror
-
 	end.
 
 
@@ -84,11 +106,12 @@ loop(Args) ->
 		stop ->
 			exit(ok);
 	
+		%% daemon management related
 		{From, ping} ->
 			From ! {twitter, {pong, self()}};
 		
-		{From, {request, Auth, Method, Params}} ->
-			twitter_api:request({From, twitter}, Auth, Method, Params)
+		{From, {request, Auth, Method, Params, OpParams}} ->
+			twitter_api:request({From, twitter}, Auth, Method, Params, OpParams)
 	
 	end,
 	loop(Args).
