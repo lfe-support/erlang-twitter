@@ -25,7 +25,7 @@
 		]).
 
 -export([
-		 update_status/3
+		 request/3
 		 ]).
 
 %%
@@ -46,10 +46,9 @@ stop() ->
 ping() ->
 	rpc(ping).
 
-
-update_status(Username, Password, Status) ->
-	rpc({update_status, Username, Password, Status}).
-
+request({auth, Username, Password}, Method, Params) ->
+	rpc({request, {auth, Username, Password}, Method, Params}).
+  
 
 rpc(Q) ->
 	%%io:format("twitteradmin: rpc(~p)~n", [Q]),
@@ -88,8 +87,8 @@ loop(Args) ->
 		{From, ping} ->
 			From ! {twitter, {pong, self()}};
 		
-		{From, {update_status, Username, Password, Status}} ->
-			twitter_api:update_status({From, Return}, Username, Password, Status)
+		{From, {request, Auth, Method, Params}} ->
+			twitter_api:request({From, twitter}, Auth, Method, Params)
 	
 	end,
 	loop(Args).
