@@ -11,6 +11,7 @@ from helpers import *
 this_lib="twitter"
 
 all = [
+		{'src': './project/src',     'dst':'./project/packages/debian/usr/lib/erlang/lib/twitter-%s/src'},	   
 		{'src': './project/ebin',    'dst':'./project/packages/debian/usr/lib/erlang/lib/twitter-%s/ebin'},
 		{'src': './project/include', 'dst':'./project/packages/debian/usr/lib/erlang/lib/twitter-%s/include'},
 		]
@@ -29,7 +30,7 @@ def release():
 			dst = one['dst']
 			#release
 			print "> cloning [%s]" % src
-			safe_copytree(	src , dst % version, skip_dirs=[".svn"] )
+			safe_copytree(	src , dst % version, skip_dirs=[".svn", "_old"] )
 		
 		print """> removing /tmp directory"""
 		shutil.rmtree('/tmp/%s_deb' % this_lib, ignore_errors=True)
