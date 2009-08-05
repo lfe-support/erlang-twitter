@@ -39,7 +39,7 @@ def adjust_control_files(params, c_path):
     files = ['control', 'postinst', 'postrm', 'preinst', 'prerm']
     for file in files:
         path = "%s/%s" % (c_path, file)
-        print "scons: adjusting [%s]" % path
+        print "> adjusting [%s]" % path
         replace_params(path,path,params)
 
 def get_gcpwd():
@@ -74,6 +74,9 @@ class pyjld_os_Error(EnvironmentError):
     """
     pass
 
+
+class WindowsError(Exception):
+    pass
 
 
 def safe_copytree(src, dst, symlinks=False, dir_mode=0777, skip_dirs=[], make_dirs=False):
