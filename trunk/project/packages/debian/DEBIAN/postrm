@@ -61,7 +61,7 @@ if (command == 'remove') or (command == 'purge'):
 	files=[]
 	try:
 		#gather all target paths
-		files.extend( glob.glob( base % "*" ) )
+		files.extend( glob.glob( base + "*" ) )
 		print files
 		
 		for path in files:
