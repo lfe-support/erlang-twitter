@@ -36,7 +36,7 @@ import os
 import sys
 import glob
 
-this_lib     = "pem"
+this_lib     = "twitter"
 this_version = "$version"
 
 try:    command = sys.argv[1]
@@ -47,31 +47,37 @@ except: version = ''
 
 print "%s: postrm: cmd[%s] version[%s]" % (this_lib, command, version)
 
-libs  = ['/usr/lib/libpem_common%s.so',]
-execs = [	'/usr/bin/pem_drv_mng%s', 
-			'/usr/bin/pem_drv_ifk%s'
-		]
+base="/usr/lib/erlang/lib/twitter"
 
-all = libs+execs
+"""
+	1) Remove all directories matching 'base'
+	2) Remove symlink
+"""
 
-try:
+# handle 'PURGE' and 'remove' commands
+# ====================================
+if (command == 'remove') or (command == 'purge'):
 
-	# handle 'PURGE' and 'remove' commands
-	# ====================================
-	if (command == 'remove') or (command == 'purge'):
-	
-		files=[]
-		try:
-			for one in all:
-				files.extend( glob.glob( one % "*" ) )
-			
-			for file in files:
-				os.remove( file )
-				print "%s: removed [%s]" % (this_lib, file)
-		except:
-			pass
-	
-except:
-	pass
+	files=[]
+	try:
+		#gather all target paths
+		files.extend( glob.glob( base % "*" ) )
+		
+		for path in files:
+			#first, try removing as path was a file
+			try:
+				os.remove( path )
+				print "%s: removed file [%s]" % (this_lib, path)					
+			except:
+				#if this fails, try assuming it is a directory
+				try:
+					shutil.rmtree( path )
+					print "%s: removed dir [%s]" % (this_lib, path)
+				except:
+				 	print "%s: can't remove path [%s]" % (this_lib, path)
+				
+	except:
+		pass
+
 
 sys.exit(0)

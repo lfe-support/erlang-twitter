@@ -30,7 +30,7 @@
 import os
 import sys
 
-this_lib     = "pem"
+this_lib     = "twitter"
 this_version = "$version"
 
 command = sys.argv[1]
@@ -40,97 +40,50 @@ cwd     = os.getcwd()
 print "%s: postinst: command[%s] configured version [%s] this version[%s]" % (this_lib, command, version, this_version)
 
 """
-	Libraries:
-	==========
-	
-	libpem_common_debug.so
-	libpem_common.so
-	
-	Executables:
-	============
-	pem_drv_mng_debug
-	pem_drv_mng
-	
-	pem_drv_ifk_debug
-	pem_drv_ifk
-	
+	1) Remove previous configured version symlink (if any)
+	2) Create current version symlink
 """
 
-libs  = ['/usr/lib/libpem_common%s.so',]
-execs = [	'/usr/bin/pem_drv_mng%s', 
-			'/usr/bin/pem_drv_ifk%s'
-		]
-
-all = libs + execs
-
-"""
-	1- remove currently configured version
-	2- add symlinks
-	3- perform chmod's
-"""
+basedir="/usr/lib/erlang/lib/twitter-%s"
+basesym="/usr/lib/erlang/lib/twitter"
 
 if command == 'configure':
 
 	
 	for one in all:
 		#configured version
-		cv  = one % ("-%s"       % version)
-		cvd = one % ("_debug-%s" % version)
+		cv  = basedir % version
 		
 		#new version
-		nv  = one % ("-%s"       % this_version)
-		nvd = one % ("_debug-%s" % this_version)
+		nv  = basedir % this_version
 
-		#base ie. symlinks
-		b   = one % ""
-		bd  = one % "_debug"
-		
 		#remove current version
 		# **ONLY** if it is not the version we are trying to install ;-)
 		if version != this_version:
-			try:	
-				os.remove(cv)
-				print "%s: removed [%s]" % (this_lib, cv)
-			except:
-				print "%s: not found[%s]" % (this_lib, cv)
-				pass
+		
+			#not applicable in this context
+			pass
 			
-			try:	
-				os.remove(cvd)
-				print "%s: removed [%s]" % (this_lib, cvd)
-			except:
-				print "%s: not found[%s]" % (this_lib, cvd)	
-				pass
-
-		#remove symlinks
 		try:	
-			os.remove(b)
-			print "%s: removed [%s]" % (this_lib, b)
-			os.remove(bd)
-			print "%s: removed [%s]" % (this_lib, bd)
-		except: pass
+			os.remove(basesym)
+			print "%s: removed symlink [%s]" % (this_lib, basesym)
+		except:
+			print "%s: symlink not found[%s]" % (this_lib, basesym)
 
 		code = 0
 		try:
-			#creating symlinks
+			#creating symlink
 			
-			os.symlink( nv,  b)
-			print "%s: created symlink, src[%s] => dst[%s]" % (this_lib, nv, b)
+			os.symlink( nv,  basesym )
+			print "%s: created symlink, src[%s] => dst[%s]" % (this_lib, nv, basesym)
 			
-			os.symlink( nvd, bd)
-			print "%s: created symlink, src[%s] => dst[%s]" % (this_lib, nvd, bd)
-
-			os.chmod(nv,  0700)
-			os.chmod(nvd, 0700)
-			os.chmod(b,   0700)
-			os.chmod(bd,  0700)
+			os.chmod(nv,      0700)
+			os.chmod(basesym, 0700)
 			
 		except Exception,e:
 			print "Exception [%s]" % e
 			code = 1
 	
-	os.system("ldconfig")
+	#os.system("ldconfig")
 	sys.exit( code )
 	
-
-## TODO EPEM:  create /var/log/pem directory for sasl
