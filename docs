@@ -9,7 +9,7 @@ relpath() ->
 	"/project/src".
 	
 docpath() ->
-	"/project/docs".
+	"/project/doc".
 
 main([]) ->
 	{ok, Files}=file:list_dir("./project/src"),
