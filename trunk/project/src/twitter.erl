@@ -37,7 +37,8 @@
 		 
 		 %% Testing
 		 test/0,
-		 test_update/0
+		 test_update/0,
+		 test_bad/0
 		 ]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -103,7 +104,6 @@ loop() ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%% @spec
 req(ReplyDetails, Auth, Method, MandatoryParams, OptionalParams) ->
 	Ret = ?MODULE ! {request, ReplyDetails, Auth, Method, MandatoryParams, OptionalParams},
 	case Ret of
@@ -161,12 +161,14 @@ request(ReturnDetails, _Timeout, _Auth, Method, _MandatoryParams, _OptionalParam
 	reply(ReturnDetails, {unknown_method, Method}).
 
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% LOCAL FUNCTIONS
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 reply(undefined, Message) ->
-	io:format("~p:reply(~p)~n", [?MODULE, Message]);
+	io:format("~p:reply(~p)~n", [?MODULE, Message]),
+	Message;
 
 reply({From, Context}, Message) ->
 	From ! {Context, Message}.
@@ -190,10 +192,6 @@ doreq(Rd, Timeout, Auth, post, Method, MandatoryParams, OpParams) ->
 
 
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% LOCAL FUNCTIONS
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
 do_auth_request(ReturnDetails, Timeout, Req, {auth, Username, Password}) ->
 	do_auth_request(ReturnDetails, Timeout, get, Req, Username, Password).
 
@@ -209,6 +207,9 @@ do_auth_request(ReturnDetails, Timeout, Type, Req, {auth, Username, Password}, C
 	Auth=tools:gen_auth_header(Username, Password),
 	do_request(Type, ReturnDetails, Timeout, Req, [{"authorization", Auth}], ContentType, Body).
 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
 
@@ -253,7 +254,6 @@ test() ->
 	Password=os:getenv("twitter_password"),
 	%%Param=os:getenv("twitter_param"),
 	req(undefined, {auth, Username, Password}, statuses.user_timeline, [], []).
-	%%ReplyDetails, Auth, Method, MandatoryParams, OptionalParams	
 
 
 test_update() ->
@@ -262,4 +262,8 @@ test_update() ->
 	Param=os:getenv("twitter_param"),
 	req(undefined, {auth, Username, Password}, statuses.update, [{status, Param}], []).
 	
-
+test_bad() ->
+	Username=os:getenv("twitter_username"),
+	Password=os:getenv("twitter_password"),
+	req(undefined, {auth, Username, Password}, bad.method, [], []).
+	
