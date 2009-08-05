@@ -30,7 +30,7 @@
 import os
 import sys
 
-this_lib     = "twitter"
+this_lib     = "erlang-twitter"
 this_version = "$version"
 
 command = sys.argv[1]
@@ -50,40 +50,38 @@ basesym="/usr/lib/erlang/lib/twitter"
 if command == 'configure':
 
 	
-	for one in all:
-		#configured version
-		cv  = basedir % version
-		
-		#new version
-		nv  = basedir % this_version
-
-		#remove current version
-		# **ONLY** if it is not the version we are trying to install ;-)
-		if version != this_version:
-		
-			#not applicable in this context
-			pass
-			
-		try:	
-			os.remove(basesym)
-			print "%s: removed symlink [%s]" % (this_lib, basesym)
-		except:
-			print "%s: symlink not found[%s]" % (this_lib, basesym)
-
-		code = 0
-		try:
-			#creating symlink
-			
-			os.symlink( nv,  basesym )
-			print "%s: created symlink, src[%s] => dst[%s]" % (this_lib, nv, basesym)
-			
-			os.chmod(nv,      0700)
-			os.chmod(basesym, 0700)
-			
-		except Exception,e:
-			print "Exception [%s]" % e
-			code = 1
+	#configured version
+	cv  = basedir % version
 	
-	#os.system("ldconfig")
+	#new version
+	nv  = basedir % this_version
+
+	#remove current version
+	# **ONLY** if it is not the version we are trying to install ;-)
+	if version != this_version:
+	
+		#not applicable in this context
+		pass
+		
+	try:	
+		os.remove(basesym)
+		print "%s: removed symlink [%s]" % (this_lib, basesym)
+	except:
+		print "%s: symlink not found[%s]" % (this_lib, basesym)
+
+	code = 0
+	try:
+		#creating symlink
+		
+		os.symlink( nv,  basesym )
+		print "%s: created symlink, src[%s] => dst[%s]" % (this_lib, nv, basesym)
+		
+		os.chmod(nv,      0700)
+		os.chmod(basesym, 0700)
+		
+	except Exception,e:
+		print "Exception [%s]" % e
+		code = 1
+	
 	sys.exit( code )
 	
