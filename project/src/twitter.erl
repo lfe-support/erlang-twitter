@@ -32,7 +32,6 @@
 		 do_auth_request/5,
 		 do_request/4,
 		 do_request/5,
-		 wait_for_response/2,
 		 
 		 loop/0,
 		 
@@ -73,15 +72,23 @@ loop() ->
 
 		{request, ReplyDetails, Timeout, Auth, Method, MandatoryParams, OptionalParams} ->
 			request(ReplyDetails, Timeout, Auth, Method, MandatoryParams, OptionalParams);
-		
+
+		{http, {RequestId, {error, Reason}}} ->
+			ReturnDetails=get({requestid, RequestId}),
+			erase({requestid, RequestId}),
+			reply(ReturnDetails, {error, Reason});
+
+		%% Result = {{HttpVersion, HttpCode, HttpResponseCode}, [Headers], ResponseBody}
+		%% HttpVersion = string()         (eg. "HTTP/1.1")
+		%% HttpCode = integer()           (eg. "200")
+		%% HttpResponseCode = string()    (eg. "OK")
+		%% Headers = {key, value}, {key, value} ...
+		%% ResponseBody = string()
 		{http, {RequestId, Result}} ->
-			ok;
-			%%return_code(ReturnDetails, Result);
+			ReturnDetails=get({requestid, RequestId}),
+			erase({requestid, RequestId}),
+			reply(ReturnDetails, {response, Result})
 		
-		{error, Reason}  ->
-			ok
-			%%return_code(ReturnDetails, Reason)
-	
 	end,
 	loop().
 
@@ -212,8 +219,8 @@ do_request(Type, ReturnDetails, Timeout, Req, Headers) ->
 	case Ret of
 
 		%% Response will be messaged
-		{ok, _RequestId} ->
-			ok;
+		{ok, RequestId} ->
+			put({requestid, RequestId}, ReturnDetails);
 	
 		{error, Reason} ->
 			reply(ReturnDetails, {request_error, Reason})
@@ -224,39 +231,13 @@ do_request(Type, ReturnDetails, Timeout, Req, Headers, ContentType, Body) ->
 	Ret = http:request(Type, {CompleteReq, Headers, ContentType, Body}, [{timeout, Timeout}], [{sync, false}]),
 	case Ret of
 
-		{ok, _RequestId} ->
-			ok;
+		{ok, RequestId} ->
+			put({requestid, RequestId}, ReturnDetails);
 	
 		{error, Reason} ->
 			reply(ReturnDetails, {request_error, Reason})
 	end.
 
-
-
-wait_for_response(ReturnDetails, RequestId) ->
-	receive
-		
-		%% Result = {{HttpVersion, HttpCode, HttpResponseCode}, [Headers], ResponseBody}
-		%% HttpVersion = string()         (eg. "HTTP/1.1")
-		%% HttpCode = integer()           (eg. "200")
-		%% HttpResponseCode = string()    (eg. "OK")
-		%% Headers = {key, value}, {key, value} ...
-		%% ResponseBody = string()
-		{http, {RequestId, Result}} ->
-			return_code(ReturnDetails, Result);
-		
-		{error, Reason}  ->
-			return_code(ReturnDetails, Reason);
-		
-		Other ->
-			io:format("wait_for_response: [~p]~n", [Other]),
-			return_code(ReturnDetails, wait_error)
-	
-	after ?TIMEOUT ->
-		
-		return_code(ReturnDetails, timeout)
-			
-	end.
 
 
 
