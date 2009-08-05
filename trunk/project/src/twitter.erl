@@ -49,11 +49,13 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 start() ->
+	inets:start(),
 	Pid = spawn(?MODULE, loop, []),
 	register(?MODULE, Pid),
 	{ok,Pid}.
 
 start_link() ->
+	inets:start(),
 	Pid = spawn_link(?MODULE, loop, []),
 	register(?MODULE, Pid),
 	{ok,Pid}.
@@ -247,19 +249,17 @@ do_request(Type, ReturnDetails, Timeout, Req, Headers, ContentType, Body) ->
 
 %% request(Rd, Auth, users.show, [{user_id, UserId}], []) ->
 test() ->
-	inets:start(),
+	Username=os:getenv("twitter_username"),
+	Password=os:getenv("twitter_password"),
+	%%Param=os:getenv("twitter_param"),
+	req(undefined, {auth, Username, Password}, statuses.user_timeline, [], []).
+	%%ReplyDetails, Auth, Method, MandatoryParams, OptionalParams	
+
+
+test_update() ->
 	Username=os:getenv("twitter_username"),
 	Password=os:getenv("twitter_password"),
 	Param=os:getenv("twitter_param"),
-	%%request(undefined, {auth, Username, Password}, statuses.user_timeline, [], [{screen_name, Param}]),
-	ok.
-
-test_update() ->
-	inets:start(),
-	Username=os:getenv("twitter_username"),
-	Password=os:getenv("twitter_password"),
-	Param=os:getenv("twitter_param2"),
-	%%request(undefined, {auth, Username, Password}, statuses.update, [{status, Param}],[]),
-	ok.
+	req(undefined, {auth, Username, Password}, statuses.update, [{status, Param}], []).
 	
 
