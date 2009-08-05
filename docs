@@ -1,0 +1,42 @@
+#!/usr/bin/evn escript
+%% @author: Jean-Lou Dupont
+%%
+-mode(compile).
+-export([main/1]).
+
+%% defines... 
+relpath() ->
+	"/project/src".
+	
+docpath() ->
+	"/project/docs".
+
+main([]) ->
+	{ok, Files}=file:list_dir("./project/src"),
+	io:format("> Files [~p]~n", [Files]),
+	Sources=sources(Files),
+	io:format("> Sources [~p]~n", [Sources]),
+	{ok, Cd}=file:get_cwd(),
+	io:format("> Current working dir [~p]~n", [Cd]),
+	Path=Cd++relpath(),
+	AbsSources=make_abs(Path, Sources),
+	%%io:format(">Abs files [~p]~n", [AbsSources]),
+	DocPath=Cd++docpath(),
+	edoc:files(AbsSources, [{dir, DocPath}]).
+	
+	
+	
+sources(Liste) ->
+	lists:filter(fun(Elem) -> is_source(Elem) end,Liste). 
+
+is_source(File) ->
+	case string:str(File, ".erl") of
+		0 ->
+			false;
+		_ ->
+			true
+	end.
+	
+make_abs(Path, Liste) ->
+	lists:flatmap(fun(Elem) -> [Path++"/"++Elem] end, Liste).
+	 
