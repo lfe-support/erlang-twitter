@@ -49,22 +49,26 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+%% @spec start() -> {ok, Pid}
 start() ->
 	inets:start(),
 	Pid = spawn(?MODULE, loop, []),
 	register(?MODULE, Pid),
 	{ok,Pid}.
 
+%% @spec start_link() -> {ok, Pid}
 start_link() ->
 	inets:start(),
 	Pid = spawn_link(?MODULE, loop, []),
 	register(?MODULE, Pid),
 	{ok,Pid}.
 
+%% @spec stop() -> ok
 stop() ->
-	?MODULE ! stop.
+	?MODULE ! stop,
+	ok.
 
-
+%% @private
 loop() ->
 	receive
 		stop ->
@@ -104,6 +108,20 @@ loop() ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+%% @spec req(ReplyDetails, Auth, Method, MandatoryParams, OptionalParams) -> ok | error
+%% where
+%%		ReplyDetails = {From, Context}
+%%			From = pid()
+%%			Context = atom()
+%%		Auth = {auth, Username, Password}
+%%			Username = string()
+%%			Password = string()
+%%		Method = atom()
+%%		MandatoryParams = [] | [{Key,Value}]
+%%		OptionalParams  = [] | [{Key, Value}]
+%% @doc
+%% The parameter 'From'
+%%
 req(ReplyDetails, Auth, Method, MandatoryParams, OptionalParams) ->
 	Ret = ?MODULE ! {request, ReplyDetails, Auth, Method, MandatoryParams, OptionalParams},
 	case Ret of
@@ -113,6 +131,18 @@ req(ReplyDetails, Auth, Method, MandatoryParams, OptionalParams) ->
 			error
 	end.
 
+%% @spec req(ReplyDetails, Timeout, Auth, Method, MandatoryParams, OptionalParams) -> ok | error
+%% where
+%%		ReplyDetails = {From, Context}
+%%			From = pid()
+%%			Context = atom()
+%%		Timeout = integer()
+%%		Auth = {auth, Username, Password}
+%%			Username = string()
+%%			Password = string()
+%%		Method = atom()
+%%		MandatoryParams = [] | [{Key,Value}]
+%%		OptionalParams  = [] | [{Key, Value}]
 req(ReplyDetails, Timeout, Auth, Method, MandatoryParams, OptionalParams) ->
 	Ret = ?MODULE ! {request, ReplyDetails, Timeout, Auth, Method, MandatoryParams, OptionalParams},
 	case Ret of
@@ -126,9 +156,11 @@ req(ReplyDetails, Timeout, Auth, Method, MandatoryParams, OptionalParams) ->
 
 %% users/show
 %% ==========
+%% @private
 request(Rd, TO, Auth, users.show, [{user_id, UserId}], []) ->
 	doreq(Rd, TO, Auth, get, "users/show/show.xml", [{user_id, UserId}], []);
 
+%% @private
 request(Rd, TO, Auth, users.show, [{screen_name, ScreenName}], []) ->
 	doreq(Rd, TO, Auth, get, "users/show/show.xml", [{screen_name, ScreenName}], []);
 
@@ -137,26 +169,32 @@ request(Rd, TO, Auth, users.show, [{screen_name, ScreenName}], []) ->
 %% ======================
 %% @TODO can break down optional parameters further
 %%       user_id, screen_name, since_id, max_id, count, page
+%% @private
 request(Rd, TO, Auth, statuses.user_timeline, [], []) ->
 	doreq(Rd, TO, Auth, get, "statuses/user_timeline.xml", [], []);
 
+%% @private
 request(Rd, TO, Auth, statuses.user_timeline, [], OpParams) when is_list(OpParams) ->
 	io:format("(A)~n",[]),
 	doreq(Rd, TO, Auth, get, "statuses/user_timeline.xml", [], OpParams);
 
+%% @private
 request(Rd, _TO, _Auth, statuses.user_timeline, _, _) ->
 	reply(Rd, {method_error, statuses.user_timeline});
 
 %% statuses/update
 %% ===============
+%% @private
 request(Rd, TO, Auth, statuses.update, [{status, Status}], OpParams) ->
 	doreq(Rd, TO, Auth, post, "statuses/update.xml", [{status, Status}], OpParams);
 
+%% @private
 request(Rd, _TO, _Auth, statuses.update, _Params, _OpParams) ->
 	reply(Rd, {method_error, statuses.update});
 
 
 %% >>>> Catch-all <<<<
+%% @private
 request(ReturnDetails, _Timeout, _Auth, Method, _MandatoryParams, _OptionalParams) ->
 	reply(ReturnDetails, {unknown_method, Method}).
 
@@ -165,11 +203,12 @@ request(ReturnDetails, _Timeout, _Auth, Method, _MandatoryParams, _OptionalParam
 %% LOCAL FUNCTIONS
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-
+%% @private
 reply(undefined, Message) ->
 	io:format("~p:reply(~p)~n", [?MODULE, Message]),
 	Message;
 
+%% @private
 reply({From, Context}, Message) ->
 	From ! {Context, Message}.
 
@@ -177,13 +216,14 @@ reply({From, Context}, Message) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-
+%% @private
 doreq(Rd, Timeout, Auth, get, Method, MandatoryParams, OpParams) ->
 	Params=lists:append(MandatoryParams, OpParams),
 	PL=tools:encode_list(Params),
 	Req=Method++tools:format_encoded_list(PL),
 	do_auth_request(Rd, Timeout, get, Req, Auth);
 
+%% @private
 doreq(Rd, Timeout, Auth, post, Method, MandatoryParams, OpParams) ->
 	Params=lists:append(MandatoryParams, OpParams),
 	Body=tools:encode_list(Params),
@@ -191,18 +231,21 @@ doreq(Rd, Timeout, Auth, post, Method, MandatoryParams, OpParams) ->
 
 
 
-
+%% @private
 do_auth_request(ReturnDetails, Timeout, Req, {auth, Username, Password}) ->
 	do_auth_request(ReturnDetails, Timeout, get, Req, Username, Password).
 
+%% @private
 do_auth_request(ReturnDetails, Timeout, Type, Req, {auth, Username, Password}) ->
 	Auth=tools:gen_auth_header(Username, Password),
 	do_request(Type, ReturnDetails, Timeout, Req, [{"authorization", Auth}]).
 
+%% @private
 do_auth_request(ReturnDetails, Timeout, Type, Req, Username, Password) ->
 	Auth=tools:gen_auth_header(Username, Password),
 	do_request(Type, ReturnDetails, Timeout, Req, [{"authorization", Auth}]).
 
+%% @private
 do_auth_request(ReturnDetails, Timeout, Type, Req, {auth, Username, Password}, ContentType, Body) ->
 	Auth=tools:gen_auth_header(Username, Password),
 	do_request(Type, ReturnDetails, Timeout, Req, [{"authorization", Auth}], ContentType, Body).
@@ -212,10 +255,11 @@ do_auth_request(ReturnDetails, Timeout, Type, Req, {auth, Username, Password}, C
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
-
+%% @private
 do_request(ReturnDetails, Timeout, Req, Headers) ->
 	do_request(get, ReturnDetails, Timeout, Req, Headers).
 
+%% @private
 do_request(Type, ReturnDetails, Timeout, Req, Headers) ->
 	CompleteReq=?API++Req,
 	Ret = http:request(Type, {CompleteReq, Headers}, [{timeout, Timeout}], [{sync, false}]),
@@ -229,6 +273,7 @@ do_request(Type, ReturnDetails, Timeout, Req, Headers) ->
 			reply(ReturnDetails, {request_error, Reason})
 	end.
 
+%% @private
 do_request(Type, ReturnDetails, Timeout, Req, Headers, ContentType, Body) ->
 	CompleteReq=?API++Req,
 	Ret = http:request(Type, {CompleteReq, Headers, ContentType, Body}, [{timeout, Timeout}], [{sync, false}]),
@@ -249,19 +294,24 @@ do_request(Type, ReturnDetails, Timeout, Req, Headers, ContentType, Body) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% request(Rd, Auth, users.show, [{user_id, UserId}], []) ->
+%% @private
+%% @hidden
 test() ->
 	Username=os:getenv("twitter_username"),
 	Password=os:getenv("twitter_password"),
 	%%Param=os:getenv("twitter_param"),
 	req(undefined, {auth, Username, Password}, statuses.user_timeline, [], []).
 
-
+%% @private
+%% @hidden
 test_update() ->
 	Username=os:getenv("twitter_username"),
 	Password=os:getenv("twitter_password"),
 	Param=os:getenv("twitter_param"),
 	req(undefined, {auth, Username, Password}, statuses.update, [{status, Param}], []).
-	
+
+%% @private
+%% @hidden
 test_bad() ->
 	Username=os:getenv("twitter_username"),
 	Password=os:getenv("twitter_password"),
