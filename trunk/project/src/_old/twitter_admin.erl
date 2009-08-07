@@ -55,7 +55,6 @@ stop(Code) ->
 %%
 run(Command) ->
 	
-	%% Register ourselves as message switch
 	Pid = spawn(?MODULE, loop, []),
 	register(?MODULE, Pid),
 	
