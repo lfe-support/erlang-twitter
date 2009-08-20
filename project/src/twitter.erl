@@ -11,6 +11,11 @@
 -module(twitter).
 
 %%
+%% Macros 
+%%
+-define(TOOLS, twitter_tools).
+
+%%
 %% Exported Functions
 %%
 -export([
@@ -219,14 +224,14 @@ reply({From, Context}, Message) ->
 %% @private
 doreq(Rd, Timeout, Auth, get, Method, MandatoryParams, OpParams) ->
 	Params=lists:append(MandatoryParams, OpParams),
-	PL=tools:encode_list(Params),
-	Req=Method++tools:format_encoded_list(PL),
+	PL=?TOOLS:encode_list(Params),
+	Req=Method++?TOOLS:format_encoded_list(PL),
 	do_auth_request(Rd, Timeout, get, Req, Auth);
 
 %% @private
 doreq(Rd, Timeout, Auth, post, Method, MandatoryParams, OpParams) ->
 	Params=lists:append(MandatoryParams, OpParams),
-	Body=tools:encode_list(Params),
+	Body=?TOOLS:encode_list(Params),
 	do_auth_request(Rd, Timeout, post, Method, Auth, "application/x-www-form-urlencoded", Body).
 
 
@@ -237,17 +242,17 @@ do_auth_request(ReturnDetails, Timeout, Req, {auth, Username, Password}) ->
 
 %% @private
 do_auth_request(ReturnDetails, Timeout, Type, Req, {auth, Username, Password}) ->
-	Auth=tools:gen_auth_header(Username, Password),
+	Auth=?TOOLS:gen_auth_header(Username, Password),
 	do_request(Type, ReturnDetails, Timeout, Req, [{"authorization", Auth}]).
 
 %% @private
 do_auth_request(ReturnDetails, Timeout, Type, Req, Username, Password) ->
-	Auth=tools:gen_auth_header(Username, Password),
+	Auth=?TOOLS:gen_auth_header(Username, Password),
 	do_request(Type, ReturnDetails, Timeout, Req, [{"authorization", Auth}]).
 
 %% @private
 do_auth_request(ReturnDetails, Timeout, Type, Req, {auth, Username, Password}, ContentType, Body) ->
-	Auth=tools:gen_auth_header(Username, Password),
+	Auth=?TOOLS:gen_auth_header(Username, Password),
 	do_request(Type, ReturnDetails, Timeout, Req, [{"authorization", Auth}], ContentType, Body).
 
 

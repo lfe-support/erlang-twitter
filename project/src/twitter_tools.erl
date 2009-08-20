@@ -1,7 +1,7 @@
 %% Author: Jean-Lou Dupont
 %% Created: 2009-08-03
 %% Description: TODO: Add description to tools
--module(tools).
+-module(twitter_tools).
 
 %%
 %% Include files

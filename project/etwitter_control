@@ -1,0 +1,147 @@
+#!/usr/bin/env escript
+%% -*- erlang -*-
+%%! -sname etwitter_control
+%%
+%% @author Jean-Lou Dupont
+%%
+
+%% Customize here
+name() -> "etwitter".
+%% ^^^^^^^^^^^^^^^^^
+
+cmds() -> "[status|stop]".
+
+code_ok()               -> 0.
+code_error()            -> 1.
+code_daemon_found()     -> 2.
+code_daemon_not_found() -> 3.
+code_lib_not_found()    -> 4.
+code_node_not_found()   -> 5.
+
+
+err_lib()      -> name()++" library not found".
+err_daemon()   -> "daemon not found".
+err_node()     -> name()++" node not found".
+err_response() -> "invalid response.".
+
+
+msg_pid()    -> "daemon found, pid: ".
+msg_usage()  -> "usage: "++name()++"_control [-q] "++cmds().
+msg_kill()   -> "stop command sent".
+
+main(["-q", "stop"])   -> 	run(quiet,   stop);
+main(["-q", "status"]) ->	run(quiet, 	 status);
+main(["stop"]) ->			run(verbose, stop);
+main(["status"]) ->			run(verbose, status);
+	
+main([]) ->
+	msg(verbose, code_ok(), msg_usage()),
+	halt(code_ok());
+	
+main([_Cmd]) ->
+	msg(verbose, code_ok(), msg_usage()),
+	halt(code_error()).
+
+
+run(Feedback, stop) ->
+	Response = makerpc(pid, status),
+	Pid = handle(Feedback, Response, pid),
+	os:cmd("kill -9 "++Pid),
+	msg(Feedback, code_ok(), msg_kill());
+	
+	
+run(Feedback, busses) ->
+	Response = makerpc(busses, getbusses),
+	Busses   = handle(Feedback, Response, busses),
+	msg(Feedback, code_ok(), msg_busses(), Busses);
+	
+run(Feedback, nodes) ->
+	Response = makerpc(nodes, getnodes),
+	Nodes    = handle(Feedback, Response, nodes),
+	msg(Feedback, code_ok(), msg_nodes(), Nodes);
+	
+	
+run(Feedback, status) ->
+	Response = makerpc(pid, status),
+	Pid = handle(Feedback, Response, pid),
+	msg(Feedback, code_daemon_found(), msg_pid(), Pid).
+
+	
+
+handle(Feedback, Code, Context) ->
+	%%for development
+	add_cwd(),
+	
+	case Code of
+		daemon_not_found ->
+			msg(Feedback, code_daemon_not_found(), err_daemon());
+					
+		{error, lib_not_found} ->
+			msg(Feedback, code_lib_not_found(), err_lib());
+			
+		{error, node_not_found} ->
+			msg(Feedback, code_node_not_found(), err_node());
+	
+		{Context, Message} ->
+			Message;
+			
+		Other ->
+			io:format("Other: ~p~n", [Other]),
+			msg(Feedback, code_error(), err_response())
+	end.
+
+
+
+add_cwd() ->
+	{ok,Cwd}=file:get_cwd(),
+	Cp=Cwd++"/ebin",
+	code:add_pathsa([Cp]).
+
+
+msg(Feedback, Code, Msg) ->
+	case Feedback of 
+		verbose ->
+			io:format(name()++"_control: ~s~n", [Msg]);
+		_ ->
+			ok
+	end,	
+	halt(Code).
+
+msg(Feedback, Code, Msg1, Msg2) when is_list(Msg2)->
+	case Feedback of 
+		verbose ->
+			io:format(name()++"_control: ~s~p~n", [Msg1, Msg2]);
+		_ ->
+			ok
+	end,	
+	halt(Code);
+	
+	
+	
+msg(Feedback, Code, Msg1, Msg2) ->
+	msg(Feedback, Code, Msg1++Msg2).
+
+
+
+
+%%%%%%%%%%%%%%	
+%% RPC related
+%%%%%%%%%%%%%%
+
+makerpc(Context, Command) ->
+	try
+		Reply=twitter:rpc(Command),
+		case Reply of
+			rpcerror ->
+				daemon_not_found;
+				
+			{Context, Message} ->
+				{Context, Message}	
+		end
+	catch
+		error:undef ->
+			{error, lib_not_found};
+		
+		_X:_Y ->
+			{error, node_not_found}
+	end.
