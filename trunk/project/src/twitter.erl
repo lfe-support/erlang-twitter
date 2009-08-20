@@ -24,8 +24,7 @@
 		 start/0,
 		 start_link/0,
 		 stop/0,
-		 req/5,
-		 req/6
+		 req/5, req/6
 		 ]).
 
 

@@ -50,6 +50,16 @@ request(Rd, TO, Auth, statuses.update, [{status, Status}], OpParams) ->
 request(Rd, _TO, _Auth, statuses.update, _Params, _OpParams) ->
 	?REQ:reply(Rd, {method_error, statuses.update});
 
+%% Account Rate Limit Status
+%%
+%% @private
+request(Rd, TO, Auth, account.rate_limit_status, [], []) ->
+	?REQ:doreq(Rd, TO, Auth, post, "account/rate_limit_status.xml", [], []);
+
+request(Rd, _TO, _Auth, account.rate_limit_status, _M, _O) ->
+	?REQ:reply(Rd, {method_error, account.rate_limit_status});
+
+
 
 %% >>>> Catch-all <<<<
 %% @private

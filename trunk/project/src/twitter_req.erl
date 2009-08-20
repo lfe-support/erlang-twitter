@@ -8,7 +8,7 @@
 %%
 %% Macros
 %%
--define(API,     "http://twitter.com/").
+-define(API,   "http://twitter.com/").
 -define(TOOLS, twitter_tools).
 
 %%
