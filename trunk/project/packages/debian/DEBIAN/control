@@ -1,7 +1,7 @@
 Package: erlang-twitter
 Version: $version
 Priority: optional
-Architecture: i386
+Architecture: all
 Section: Other
 Maintainer: Jean-Lou Dupont <erlang@jldupont.com>
 Description: Erlang Twitter client library
