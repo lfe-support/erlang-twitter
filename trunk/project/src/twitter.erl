@@ -4,7 +4,7 @@
 %%
 %% Support for additional methods can be easily added.
 %%
-%% Use tools:extract to retrieve a specific field
+%% Use twitter_tools:extract to retrieve a specific field
 %%  of the result-set returned by twitter_api:request
 %%
 
@@ -14,6 +14,8 @@
 %% Macros 
 %%
 -define(TOOLS, twitter_tools).
+-define(REQ,   twitter_req).
+-define(TAPI,  twitter_api).
 
 %%
 %% Exported Functions
@@ -26,18 +28,11 @@
 		 req/6
 		 ]).
 
--define(API,     "http://twitter.com/").
+
 -define(TIMEOUT, 5000).
 
 %% LOCAL
 -export([
-		 reply/2,
-		request/6,
-		 do_auth_request/4,
-		 do_auth_request/5,
-		 do_request/4,
-		 do_request/5,
-		 
 		 loop/0,
 		 
 		 %% Testing
@@ -46,14 +41,14 @@
 		 test_bad/0
 		 ]).
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%
-%%                      MODULE MANAGEMENT
-%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+%% ----------------------            ------------------------------
+%%%%%%%%%%%%%%%%%%%%%%%%% MANAGEMENT %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% ----------------------            ------------------------------
+
+
+%% Start
+%%
 %% @spec start() -> {ok, Pid}
 start() ->
 	inets:start(),
@@ -61,6 +56,8 @@ start() ->
 	register(?MODULE, Pid),
 	{ok,Pid}.
 
+%% Start Link
+%%
 %% @spec start_link() -> {ok, Pid}
 start_link() ->
 	inets:start(),
@@ -68,10 +65,18 @@ start_link() ->
 	register(?MODULE, Pid),
 	{ok,Pid}.
 
+%% Stop
+%%
 %% @spec stop() -> ok
 stop() ->
 	?MODULE ! stop,
 	ok.
+
+
+%% ----------------------             ------------------------------
+%%%%%%%%%%%%%%%%%%%%%%%%% SERVER LOOP %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% ----------------------             ------------------------------
+
 
 %% @private
 loop() ->
@@ -80,15 +85,15 @@ loop() ->
 			exit(ok);
 		
 		{request, ReplyDetails, Auth, Method, MandatoryParams, OptionalParams} ->
-			request(ReplyDetails, ?TIMEOUT, Auth, Method, MandatoryParams, OptionalParams);
+			?TAPI:request(ReplyDetails, ?TIMEOUT, Auth, Method, MandatoryParams, OptionalParams);
 
 		{request, ReplyDetails, Timeout, Auth, Method, MandatoryParams, OptionalParams} ->
-			request(ReplyDetails, Timeout, Auth, Method, MandatoryParams, OptionalParams);
+			?TAPI:request(ReplyDetails, Timeout, Auth, Method, MandatoryParams, OptionalParams);
 
 		{http, {RequestId, {error, Reason}}} ->
 			ReturnDetails=get({requestid, RequestId}),
 			erase({requestid, RequestId}),
-			reply(ReturnDetails, {error, Reason});
+			?REQ:reply(ReturnDetails, {error, Reason});
 
 		%% Result = {{HttpVersion, HttpCode, HttpResponseCode}, [Headers], ResponseBody}
 		%% HttpVersion = string()         (eg. "HTTP/1.1")
@@ -99,19 +104,18 @@ loop() ->
 		{http, {RequestId, Result}} ->
 			ReturnDetails=get({requestid, RequestId}),
 			erase({requestid, RequestId}),
-			reply(ReturnDetails, {response, Result})
+			?REQ:reply(ReturnDetails, {response, Result})
 		
 	end,
 	loop().
 
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%
-%%                      REQUEST HANDLING
-%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%% ----------------------                     ------------------------------
+%%%%%%%%%%%%%%%%%%%%%%%%% REQUEST DISPATCHING %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% ----------------------                     ------------------------------
+
+
 
 %% @spec req(ReplyDetails, Auth, Method, MandatoryParams, OptionalParams) -> ok | error
 %% where
@@ -159,144 +163,14 @@ req(ReplyDetails, Timeout, Auth, Method, MandatoryParams, OptionalParams) ->
 
 
 
-%% users/show
-%% ==========
-%% @private
-request(Rd, TO, Auth, users.show, [{user_id, UserId}], []) ->
-	doreq(Rd, TO, Auth, get, "users/show/show.xml", [{user_id, UserId}], []);
-
-%% @private
-request(Rd, TO, Auth, users.show, [{screen_name, ScreenName}], []) ->
-	doreq(Rd, TO, Auth, get, "users/show/show.xml", [{screen_name, ScreenName}], []);
-
-
-%% statuses/user_timeline
-%% ======================
-%% @TODO can break down optional parameters further
-%%       user_id, screen_name, since_id, max_id, count, page
-%% @private
-request(Rd, TO, Auth, statuses.user_timeline, [], []) ->
-	doreq(Rd, TO, Auth, get, "statuses/user_timeline.xml", [], []);
-
-%% @private
-request(Rd, TO, Auth, statuses.user_timeline, [], OpParams) when is_list(OpParams) ->
-	io:format("(A)~n",[]),
-	doreq(Rd, TO, Auth, get, "statuses/user_timeline.xml", [], OpParams);
-
-%% @private
-request(Rd, _TO, _Auth, statuses.user_timeline, _, _) ->
-	reply(Rd, {method_error, statuses.user_timeline});
-
-%% statuses/update
-%% ===============
-%% @private
-request(Rd, TO, Auth, statuses.update, [{status, Status}], OpParams) ->
-	doreq(Rd, TO, Auth, post, "statuses/update.xml", [{status, Status}], OpParams);
-
-%% @private
-request(Rd, _TO, _Auth, statuses.update, _Params, _OpParams) ->
-	reply(Rd, {method_error, statuses.update});
-
-
-%% >>>> Catch-all <<<<
-%% @private
-request(ReturnDetails, _Timeout, _Auth, Method, _MandatoryParams, _OptionalParams) ->
-	reply(ReturnDetails, {unknown_method, Method}).
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% LOCAL FUNCTIONS
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-%% @private
-reply(undefined, Message) ->
-	io:format("~p:reply(~p)~n", [?MODULE, Message]),
-	Message;
-
-%% @private
-reply({From, Context}, Message) ->
-	From ! {Context, Message}.
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-%% @private
-doreq(Rd, Timeout, Auth, get, Method, MandatoryParams, OpParams) ->
-	Params=lists:append(MandatoryParams, OpParams),
-	PL=?TOOLS:encode_list(Params),
-	Req=Method++?TOOLS:format_encoded_list(PL),
-	do_auth_request(Rd, Timeout, get, Req, Auth);
-
-%% @private
-doreq(Rd, Timeout, Auth, post, Method, MandatoryParams, OpParams) ->
-	Params=lists:append(MandatoryParams, OpParams),
-	Body=?TOOLS:encode_list(Params),
-	do_auth_request(Rd, Timeout, post, Method, Auth, "application/x-www-form-urlencoded", Body).
-
-
-
-%% @private
-do_auth_request(ReturnDetails, Timeout, Req, {auth, Username, Password}) ->
-	do_auth_request(ReturnDetails, Timeout, get, Req, Username, Password).
-
-%% @private
-do_auth_request(ReturnDetails, Timeout, Type, Req, {auth, Username, Password}) ->
-	Auth=?TOOLS:gen_auth_header(Username, Password),
-	do_request(Type, ReturnDetails, Timeout, Req, [{"authorization", Auth}]).
-
-%% @private
-do_auth_request(ReturnDetails, Timeout, Type, Req, Username, Password) ->
-	Auth=?TOOLS:gen_auth_header(Username, Password),
-	do_request(Type, ReturnDetails, Timeout, Req, [{"authorization", Auth}]).
-
-%% @private
-do_auth_request(ReturnDetails, Timeout, Type, Req, {auth, Username, Password}, ContentType, Body) ->
-	Auth=?TOOLS:gen_auth_header(Username, Password),
-	do_request(Type, ReturnDetails, Timeout, Req, [{"authorization", Auth}], ContentType, Body).
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-
-%% @private
-do_request(ReturnDetails, Timeout, Req, Headers) ->
-	do_request(get, ReturnDetails, Timeout, Req, Headers).
-
-%% @private
-do_request(Type, ReturnDetails, Timeout, Req, Headers) ->
-	CompleteReq=?API++Req,
-	Ret = http:request(Type, {CompleteReq, Headers}, [{timeout, Timeout}], [{sync, false}]),
-	case Ret of
-
-		%% Response will be messaged
-		{ok, RequestId} ->
-			put({requestid, RequestId}, ReturnDetails);
-	
-		{error, Reason} ->
-			reply(ReturnDetails, {request_error, Reason})
-	end.
-
-%% @private
-do_request(Type, ReturnDetails, Timeout, Req, Headers, ContentType, Body) ->
-	CompleteReq=?API++Req,
-	Ret = http:request(Type, {CompleteReq, Headers, ContentType, Body}, [{timeout, Timeout}], [{sync, false}]),
-	case Ret of
-
-		{ok, RequestId} ->
-			put({requestid, RequestId}, ReturnDetails);
-	
-		{error, Reason} ->
-			reply(ReturnDetails, {request_error, Reason})
-	end.
 
 
 
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% TESTING
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% ----------------------         ------------------------------
+%%%%%%%%%%%%%%%%%%%%%%%%% TESTING %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% ----------------------         ------------------------------
+
 
 %% request(Rd, Auth, users.show, [{user_id, UserId}], []) ->
 %% @private
