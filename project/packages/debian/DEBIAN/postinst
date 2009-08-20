@@ -39,49 +39,32 @@ cwd     = os.getcwd()
 
 print "%s: postinst: command[%s] configured version [%s] this version[%s]" % (this_lib, command, version, this_version)
 
-"""
-	1) Remove previous configured version symlink (if any)
-	2) Create current version symlink
-"""
+upd="update-rc.d etwitter start 20 2 3 4 5 . stop 0 1 6 ."
 
-basedir="/usr/lib/erlang/lib/twitter-%s"
-basesym="/usr/lib/erlang/lib/twitter"
+# Update the rcX.d directories
+# ============================
+proc = subprocess.Popen(upd,shell=True)
+code = proc.wait()
 
-if command == 'configure':
-
-	
-	#configured version
-	cv  = basedir % version
-	
-	#new version
-	nv  = basedir % this_version
-
-	#remove current version
-	# **ONLY** if it is not the version we are trying to install ;-)
-	if version != this_version:
-	
-		#not applicable in this context
-		pass
-		
-	try:	
-		os.remove(basesym)
-		print "%s: removed symlink [%s]" % (this_lib, basesym)
-	except:
-		print "%s: symlink not found[%s]" % (this_lib, basesym)
-
-	code = 0
+# Update symlink from /usr/bin to /etc/init.d
+# ===========================================
+slinks = [
+			{"dst":"/usr/bin/etwitter",         "src": "/etc/init.d/etwitter"},
+			{"dst":"/usr/bin/etwitter_control", "src": "/etc/init.d/etwitter_control"}
+			]
+			
+for link in slinks:
 	try:
-		#creating symlink
+		src=link["src"]
+		dst=link["dst"]
+		os.symlink( src, dst )
+		print "%s: created symlink, src[%s] => dst[%s]" % (this_lib, src, dst)
 		
-		os.symlink( nv,  basesym )
-		print "%s: created symlink, src[%s] => dst[%s]" % (this_lib, nv, basesym)
-		
-		os.chmod(nv,      0700)
-		os.chmod(basesym, 0700)
+		os.chmod(src, 0700)
 		
 	except Exception,e:
-		print "Exception [%s]" % e
-		code = 1
+		#print "Exception: %s\n" % str(e)
+		# symlink already exists? no worries
+		pass
 	
-	sys.exit( code )
-	
+sys.exit( code )
