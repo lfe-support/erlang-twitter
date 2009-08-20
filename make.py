@@ -10,12 +10,13 @@ from optparse import OptionParser
 
 from helpers import *
 
+lib="twitter"
 this_lib="erlang-twitter"
 
 all = [
-		{'src': './project/src',     'dst':'./project/packages/debian/usr/lib/erlang/lib/twitter-%s/src'},	   
-		{'src': './project/ebin',    'dst':'./project/packages/debian/usr/lib/erlang/lib/twitter-%s/ebin'},
-		{'src': './project/include', 'dst':'./project/packages/debian/usr/lib/erlang/lib/twitter-%s/include'},
+		{'src': './project/src',     'dst':"./project/packages/debian/usr/lib/erlang/lib/"+lib+"-%s/src"},	   
+		{'src': './project/ebin',    'dst':'./project/packages/debian/usr/lib/erlang/lib/'+lib+'-%s/ebin'},
+		##{'src': './project/include', 'dst':'./project/packages/debian/usr/lib/erlang/lib/twitter-%s/include'},
 		]
 
 class targets(object):
@@ -36,6 +37,11 @@ class targets(object):
 				#release
 				print "> cloning [%s]" % src
 				safe_copytree(	src , dst % version, skip_dirs=[".svn", "_old"] )
+			
+			print """> cloning daemon control files to /etc/init.d"""
+			path="./project/packages/debian/etc/init.d"
+			shutil.copy("./project/"+lib,            path)
+			shutil.copy("./project/"+lib+"_control", path)
 			
 			print """> removing /tmp directory"""
 			shutil.rmtree('/tmp/%s_deb' % this_lib, ignore_errors=True)
@@ -65,7 +71,7 @@ class targets(object):
 		
 		print "> current dir [%s]" % os.getcwd()
 		
-		name = "%s_%s-1_i386.deb" % (this_lib, version)
+		name = "%s_%s-1_all.deb" % (this_lib, version)
 		path = "/tmp/%s" % name
 		print "> renaming debian package: %s" % name
 		shutil.copy('/tmp/%s_deb.deb' % this_lib, path)
@@ -73,10 +79,17 @@ class targets(object):
 		debian_base="../dists/stable/main/binary-i386"
 		print "> copying [%s] to repo in dists/main/binary-i386" % path
 		shutil.copy(path, debian_base)
+
+		debian_base="../dists/stable/main/binary-amd64"
+		print "> copying [%s] to repo in dists/main/binary-amd64" % path
+		shutil.copy(path, debian_base)
+
 		
 		debian_path = debian_base + "/" + name
 		print "> running dpkg-scanpackages  [%s]" % debian_path
-		os.system("cd .. && dpkg-scanpackages -m dists/stable/main/binary-i386 /dev/null | gzip -9c > dists/stable/main/binary-i386/Packages.gz")
+		os.system("cd .. && dpkg-scanpackages -aall -m dists/stable/main/binary-i386 /dev/null | gzip -9c > dists/stable/main/binary-i386/Packages.gz")
+		os.system("cd .. && dpkg-scanpackages -aall -m dists/stable/main/binary-amd64 /dev/null | gzip -9c > dists/stable/main/binary-amd64/Packages.gz")
+
 		
 		print "> removing sources archive build directory"
 		try:    shutil.rmtree("/tmp/%s/%s" % (this_lib, this_lib))
@@ -90,7 +103,7 @@ class targets(object):
 		#os.system("rm -r /tmp/%s/%s/*.pyc" % (this_lib, this_lib))
 		
 		print "> creating ZIP archive"
-		os.system("cd /tmp/%s && zip -r /tmp/%s-sources-%s.zip %s -x *.svn* *.os *.so *.LOG *.DAT *.settings* *.cproject* *.project* *.pydevproject* *old* *.prefs" % (this_lib, this_lib, version, this_lib))
+		os.system("cd /tmp/%s && zip -r /tmp/%s-sources-%s.zip %s -x *.svn* *.os *.so *.LOG *.DAT *.settings* *.cproject* *.project* *.pydevproject* *.pyc *old* *.prefs" % (this_lib, this_lib, version, this_lib))
 
 	def up(cls):
 		import gcupload as gc
@@ -113,10 +126,10 @@ class targets(object):
 		
 		#upload(file, project_name, user_name, password, summary, labels=None)
 		src = "/tmp/%s-sources-%s.zip" % (this_lib, version)
-		gc.upload(src, "erlang-twitter", user, pwd, "sources archive", ["sources", "featured"])
+		gc.upload(src, this_lib, user, pwd, "sources archive", ["sources", "featured"])
 		
 		deb = "/tmp/%s_%s-1_i386.deb" % (this_lib, version)
-		gc.upload(deb, "erlang-twitter", user, pwd, "debian binary-i386", ["Type-Package", "OpSys-Linux", "featured"])
+		gc.upload(deb, this_lib, user, pwd, "debian", ["Type-Package", "OpSys-Linux", "featured"])
 
 	
 	def default(cls):
