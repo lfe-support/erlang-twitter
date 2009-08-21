@@ -7,12 +7,17 @@
 %% Use twitter_tools:extract to retrieve a specific field
 %%  of the result-set returned by twitter_api:request
 %%
+%% Daemon:
+%%  - reads configuration file in ~/.twitter
+%%  - can reload the configuration file
+%%
 
 -module(twitter).
 
 %%
 %% Macros 
 %%
+-define(SERVER,twitter_server).
 -define(TOOLS, twitter_tools).
 -define(REQ,   twitter_req).
 -define(TAPI,  twitter_api).
@@ -82,6 +87,15 @@ loop() ->
 	receive
 		stop ->
 			exit(ok);
+		
+		%% RPC bridge
+		%%
+		%% Messages ending up here are (usually ;-)
+		%% sent through using the 'rpc' function.
+		%%
+		{rpc, ReplyTo, {FromNode, Q}} ->
+			handle_rpc(ReplyTo, FromNode, Q);
+
 		
 		{request, ReplyDetails, Auth, Method, MandatoryParams, OptionalParams} ->
 			?TAPI:request(ReplyDetails, ?TIMEOUT, Auth, Method, MandatoryParams, OptionalParams);
@@ -162,8 +176,69 @@ req(ReplyDetails, Timeout, Auth, Method, MandatoryParams, OptionalParams) ->
 
 
 
+%% ----------------------                   ------------------------------
+%%%%%%%%%%%%%%%%%%%%%%%%% DAEMON MANAGEMENT %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% ----------------------                   ------------------------------
+
+%%
+%% @spec daemon_api(status) -> {pid, Pid}
+%%
+%% @private
+daemon_api(status) ->
+	{pid, os:getpid()};
+
+%% @spec daemon_api(reload) -> {error, Reason} | ok
+daemon_api(reload) ->
+	rpc(reload).
+
+daemon_api(_) ->
+	{error, invalid_command}.
 
 
+
+
+%% ----------------------                 ------------------------------
+%%%%%%%%%%%%%%%%%%%%%%%%% LOCAL FUNCTIONS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% ----------------------                 ------------------------------
+
+
+%% @private
+rpc(Q) ->
+	FromNode=node(),
+	%%io:format("call: from[~p] Q[~p]~n", [FromNode, Q]),
+	%%?TOOLS:msg("rpc: From[~p] Message[~p]", [FromNode, Q]),
+	?SERVER ! {rpc, self(), {FromNode, Q}},
+	receive
+		{rpc_reply, Reply} ->
+			Reply;
+	
+		Other ->
+			error_logger:error_msg("~p rpc: received [~p]~n", [?MODULE, Other]),
+			{error, rpcerror}
+	
+	after ?TIMEOUT ->
+			error_logger:error_msg("~p: rpc: timeout~n", [?MODULE]),
+			{error, rpc_timeout}
+	end.
+
+
+%% ----------------------              ------------------------------
+%%%%%%%%%%%%%%%%%%%%%%%%% RPC handling %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% ----------------------              ------------------------------
+
+
+
+handle_rpc(ReplyTo, FromNode, Q) ->
+	ok.
+
+%% Replies to an RPC call.
+%% The recipient loop of the message normally sits
+%% in the code of the function 'rpc'.
+%%
+rpc_reply(ReplyTo, Message) ->
+	ReplyTo ! {rpc_reply, Message}.
+
+	
 
 
 %% ----------------------         ------------------------------
