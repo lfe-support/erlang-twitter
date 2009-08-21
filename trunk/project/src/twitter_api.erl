@@ -14,7 +14,7 @@
 %% Macros
 %%
 -define(SERVER, twitter).
--define(REQ, twitter_req).
+-define(REQ,    twitter_req).
 
 
 %% ----------------------                     ------------------------------

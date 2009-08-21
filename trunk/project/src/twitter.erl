@@ -10,7 +10,8 @@
 %% Daemon:
 %%  - reads configuration file in ~/.twitter
 %%  - can reload the configuration file
-%%
+%%  - status of mswitch subscription
+%%  - 
 
 -module(twitter).
 
