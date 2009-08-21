@@ -257,7 +257,7 @@ kfind(Key, [], Default) ->
 	{Key, Default};
 
 kfind(Key, List, Default) ->
-	Ret=base:kfind(Key, List),
+	Ret=kfind(Key, List),
 	case Ret of
 		false ->
 			{Key, Default};

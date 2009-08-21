@@ -17,10 +17,11 @@
 %%
 %% Macros 
 %%
--define(SERVER,twitter_server).
+-define(SERVER,twitter).
 -define(TOOLS, twitter_tools).
 -define(REQ,   twitter_req).
 -define(TAPI,  twitter_api).
+-define(MNG,   twitter_mng).
 
 %%
 %% Exported Functions
@@ -29,7 +30,8 @@
 		 start/0,
 		 start_link/0,
 		 stop/0,
-		 req/5, req/6
+		 req/5, req/6,
+		 daemon_api/1
 		 ]).
 
 
@@ -57,7 +59,8 @@
 start() ->
 	inets:start(),
 	Pid = spawn(?MODULE, loop, []),
-	register(?MODULE, Pid),
+	register(?SERVER, Pid),
+	?SERVER ! start,
 	{ok,Pid}.
 
 %% Start Link
@@ -66,14 +69,15 @@ start() ->
 start_link() ->
 	inets:start(),
 	Pid = spawn_link(?MODULE, loop, []),
-	register(?MODULE, Pid),
+	register(?SERVER, Pid),
+	?SERVER ! start,
 	{ok,Pid}.
 
 %% Stop
 %%
 %% @spec stop() -> ok
 stop() ->
-	?MODULE ! stop,
+	?SERVER ! stop,
 	ok.
 
 
@@ -85,6 +89,9 @@ stop() ->
 %% @private
 loop() ->
 	receive
+		start ->
+			?MNG:load_config();
+		
 		stop ->
 			exit(ok);
 		
@@ -189,7 +196,7 @@ daemon_api(status) ->
 
 %% @spec daemon_api(reload) -> {error, Reason} | ok
 daemon_api(reload) ->
-	rpc(reload).
+	rpc(reload);
 
 daemon_api(_) ->
 	{error, invalid_command}.
@@ -197,6 +204,30 @@ daemon_api(_) ->
 
 
 
+
+%% ----------------------              ------------------------------
+%%%%%%%%%%%%%%%%%%%%%%%%% RPC handling %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% ----------------------              ------------------------------
+
+
+
+handle_rpc(ReplyTo, _FromNode, reload) ->
+	Result=?MNG:load_config(),
+	rpc_reply(ReplyTo, Result);
+
+
+handle_rpc(ReplyTo, _, _) ->
+	rpc_reply(ReplyTo, {error, invalid_request}).
+
+
+%% Replies to an RPC call.
+%% The recipient loop of the message normally sits
+%% in the code of the function 'rpc'.
+%%
+rpc_reply(ReplyTo, Message) ->
+	ReplyTo ! {rpc_reply, Message}.
+
+	
 %% ----------------------                 ------------------------------
 %%%%%%%%%%%%%%%%%%%%%%%%% LOCAL FUNCTIONS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% ----------------------                 ------------------------------
@@ -220,25 +251,6 @@ rpc(Q) ->
 			error_logger:error_msg("~p: rpc: timeout~n", [?MODULE]),
 			{error, rpc_timeout}
 	end.
-
-
-%% ----------------------              ------------------------------
-%%%%%%%%%%%%%%%%%%%%%%%%% RPC handling %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% ----------------------              ------------------------------
-
-
-
-handle_rpc(ReplyTo, FromNode, Q) ->
-	ok.
-
-%% Replies to an RPC call.
-%% The recipient loop of the message normally sits
-%% in the code of the function 'rpc'.
-%%
-rpc_reply(ReplyTo, Message) ->
-	ReplyTo ! {rpc_reply, Message}.
-
-	
 
 
 %% ----------------------         ------------------------------
