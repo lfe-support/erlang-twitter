@@ -23,6 +23,7 @@
 -define(REQ,   twitter_req).
 -define(TAPI,  twitter_api).
 -define(MNG,   twitter_mng).
+-define(RPC,   twitter_rpc).
 
 %%
 %% Exported Functions
@@ -101,7 +102,7 @@ loop() ->
 		%% sent through using the 'rpc' function.
 		%%
 		{rpc, ReplyTo, {FromNode, Q}} ->
-			handle_rpc(ReplyTo, FromNode, Q);
+			?RPC:handle_rpc(ReplyTo, FromNode, Q);
 
 		
 		{request, ReplyDetails, Auth, Method, MandatoryParams, OptionalParams} ->
@@ -147,7 +148,7 @@ daemon_api(status) ->
 
 %% @spec daemon_api(reload) -> {error, Reason} | ok
 daemon_api(reload) ->
-	rpc(reload);
+	?RPC:rpc(reload);
 
 daemon_api(_) ->
 	{error, invalid_command}.
@@ -156,52 +157,6 @@ daemon_api(_) ->
 
 
 
-%% ----------------------              ------------------------------
-%%%%%%%%%%%%%%%%%%%%%%%%% RPC handling %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% ----------------------              ------------------------------
-
-
-
-handle_rpc(ReplyTo, _FromNode, reload) ->
-	Result=?MNG:load_config(),
-	rpc_reply(ReplyTo, Result);
-
-
-handle_rpc(ReplyTo, _, _) ->
-	rpc_reply(ReplyTo, {error, invalid_request}).
-
-
-%% Replies to an RPC call.
-%% The recipient loop of the message normally sits
-%% in the code of the function 'rpc'.
-%%
-rpc_reply(ReplyTo, Message) ->
-	ReplyTo ! {rpc_reply, Message}.
-
-	
-%% ----------------------                 ------------------------------
-%%%%%%%%%%%%%%%%%%%%%%%%% LOCAL FUNCTIONS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% ----------------------                 ------------------------------
-
-
-%% @private
-rpc(Q) ->
-	FromNode=node(),
-	%%io:format("call: from[~p] Q[~p]~n", [FromNode, Q]),
-	%%?TOOLS:msg("rpc: From[~p] Message[~p]", [FromNode, Q]),
-	?SERVER ! {rpc, self(), {FromNode, Q}},
-	receive
-		{rpc_reply, Reply} ->
-			Reply;
-	
-		Other ->
-			error_logger:error_msg("~p rpc: received [~p]~n", [?MODULE, Other]),
-			{error, rpcerror}
-	
-	after ?TIMEOUT ->
-			error_logger:error_msg("~p: rpc: timeout~n", [?MODULE]),
-			{error, rpc_timeout}
-	end.
 
 
 %% ----------------------         ------------------------------
