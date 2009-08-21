@@ -7,15 +7,22 @@
 %%
 %% MACROS
 %%
--define(MNG, twitter_mng).
--define(SERVER, twitter).
--define(TIMEOUT, 1000).
+-define(SUPPORTED_CMDS, [getapiversion, reload, status, getstats, getparams]).
+-define(API_VERSION, 1).
+-define(MNG,        twitter_mng).
+-define(SERVER,     twitter).
+-define(TIMEOUT,    1000).
 
 
 
 %% ----------------------              ------------------------------
 %%%%%%%%%%%%%%%%%%%%%%%%% RPC handling %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% ----------------------              ------------------------------
+
+%% Retrieves the supported commands through the RPC interface
+%%
+handle_rpc(ReplyTo, _FromNode, getcmds) ->
+	rpc_reply(ReplyTo, {cmds, ?SUPPORTED_CMDS});
 
 
 %% Reloads the configuration from file
@@ -36,10 +43,24 @@ handle_rpc(ReplyTo, _FromNode, getparams) ->
 	Params=?MNG:get_dicparams(),
 	rpc_reply(ReplyTo, {params, Params});
 
+%% Retrieves the API version
+%%
+handle_rpc(ReplyTo, _FromNode, getapiversion) ->
+	rpc_reply(ReplyTo, {apiversion, ?API_VERSION});
+
 %% CATCH-ALL
 %%
 handle_rpc(ReplyTo, _, _) ->
 	rpc_reply(ReplyTo, {error, invalid_request}).
+
+
+%% Validates if the RPC Command is supported
+%%
+rpc_validate_command(Command) when is_atom(Command) ->
+	lists:member(Command, ?SUPPORTED_CMDS);
+
+rpc_validate_command(_) ->
+	invalid.
 
 
 %% Replies to an RPC call.
