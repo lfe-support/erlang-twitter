@@ -19,6 +19,13 @@
 -define(PARAMS_BLACKLIST, [user, pass]).
 
 
+
+%% ----------------------        ------------------------------
+%%%%%%%%%%%%%%%%%%%%%%%%% CONFIG %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% ----------------------        ------------------------------
+
+	   
+
 %% Loads the config file and
 %% updates the local variables &
 %% config state.
@@ -162,6 +169,11 @@ process_config(Terms, true, true) ->
 	{ok, Terms}.
 
 
+%% ----------------------        ------------------------------
+%%%%%%%%%%%%%%%%%%%%%%%%% PARAMS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% ----------------------        ------------------------------
+
+
 %% Returns all the {param, ...} parameters
 %% from the process dictionary.
 %%
@@ -173,17 +185,61 @@ get_dicparams([]) ->
 	[];
 
 get_dicparams(List) when is_list(List) ->
-	Fun = fun(Elem) ->
-				case Elem of
-					{{param, _Name}, _Value} -> true;
-					_ -> false
-				end
-	end,
-	lists:filter(Fun, List).
+	get_dicclass(List, param).
 
-						
 	
+%% Retrieves a 'class' of keys from the
+%% process dictionary.
+%%
+get_dicclass(Class) ->
+	get_dicclass(get(), Class).
+
+get_dicclass(List, Class) when is_atom(Class)->
+	Fun = fun(Elem) ->
+			case Elem of
+				{{Class, _Name}, _Value} -> true;
+				_ -> false
+			end
+		end,
+	lists:filter(Fun, List);
+
+get_dicclass(_,_) ->
+	{error, invalid_class}.
+
+
+%% ----------------------       ------------------------------
+%%%%%%%%%%%%%%%%%%%%%%%%% STATS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% ----------------------       ------------------------------
+
+
+inc_stat(Stat) ->
+	inc_stat(Stat, 1).
+
+
+%% @doc Increments an internal 'statistics' variable 'Stat' by 'Count'
+%%      and returns the new count.
+inc_stat(Stat, Count) when is_integer(Count) ->
+	Value=?TOOLS:getvar({stat, Stat}, 0),
+	New=Value+Count,
+	put({stat, Stat}, New),
+	New;
+
+inc_stat(_,_) ->
+	{error, invalid_count}.
+
+
 	
+get_stat(Stat) when is_atom(Stat)->
+	?TOOLS:getvar({stat, Stat}, 0);
+
+get_stat(_) ->
+	{error, invalid_name}.
+
+put_stat(Stat, Value) when is_atom(Stat) ->
+	put({stat, Stat}, Value);
+
+put_stat(_, _) ->
+	{error, invalid_name}.
 
 
 
