@@ -119,3 +119,35 @@ request(Rd, _TO, _Auth, account.rate_limit_status, _M, _O) ->
 %% @private
 request(ReturnDetails, _Timeout, _Auth, Method, _MandatoryParams, _OptionalParams) ->
 	?REQ:reply(ReturnDetails, {unknown_method, Method}).
+
+
+
+%% ----------------------         ------------------------------
+%%%%%%%%%%%%%%%%%%%%%%%%% TESTING %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% ----------------------         ------------------------------
+
+
+%% request(Rd, Auth, users.show, [{user_id, UserId}], []) ->
+%% @private
+%% @hidden
+test() ->
+	Username=os:getenv("twitter_username"),
+	Password=os:getenv("twitter_password"),
+	%%Param=os:getenv("twitter_param"),
+	req(undefined, {auth, Username, Password}, statuses.user_timeline, [], []).
+
+%% @private
+%% @hidden
+test_update() ->
+	Username=os:getenv("twitter_username"),
+	Password=os:getenv("twitter_password"),
+	Param=os:getenv("twitter_param"),
+	req(undefined, {auth, Username, Password}, statuses.update, [{status, Param}], []).
+
+%% @private
+%% @hidden
+test_bad() ->
+	Username=os:getenv("twitter_username"),
+	Password=os:getenv("twitter_password"),
+	req(undefined, {auth, Username, Password}, bad.method, [], []).
+	

@@ -40,12 +40,7 @@
 
 %% LOCAL
 -export([
-		 loop/0,
-		 
-		 %% Testing
-		 test/0,
-		 test_update/0,
-		 test_bad/0
+		 loop/0
 		 ]).
 
 
@@ -146,45 +141,16 @@ loop() ->
 daemon_api(status) ->
 	{pid, os:getpid()};
 
-%% @spec daemon_api(reload) -> {error, Reason} | ok
-daemon_api(reload) ->
-	?RPC:rpc(reload);
-
-daemon_api(_) ->
-	{error, invalid_command}.
-
-
-
+daemon_api(Command) ->
+	case ?RPC:rpc_validate_command(Command) of
+		true ->
+			?RPC:rpc(Command);
+		_ ->
+			{error, invalid_command}
+	end.
 
 
 
 
-%% ----------------------         ------------------------------
-%%%%%%%%%%%%%%%%%%%%%%%%% TESTING %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% ----------------------         ------------------------------
 
 
-%% request(Rd, Auth, users.show, [{user_id, UserId}], []) ->
-%% @private
-%% @hidden
-test() ->
-	Username=os:getenv("twitter_username"),
-	Password=os:getenv("twitter_password"),
-	%%Param=os:getenv("twitter_param"),
-	?TAPI:req(undefined, {auth, Username, Password}, statuses.user_timeline, [], []).
-
-%% @private
-%% @hidden
-test_update() ->
-	Username=os:getenv("twitter_username"),
-	Password=os:getenv("twitter_password"),
-	Param=os:getenv("twitter_param"),
-	?TAPI:req(undefined, {auth, Username, Password}, statuses.update, [{status, Param}], []).
-
-%% @private
-%% @hidden
-test_bad() ->
-	Username=os:getenv("twitter_username"),
-	Password=os:getenv("twitter_password"),
-	?TAPI:req(undefined, {auth, Username, Password}, bad.method, [], []).
-	
