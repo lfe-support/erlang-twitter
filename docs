@@ -27,7 +27,7 @@ main([]) ->
 	
 	
 sources(Liste) ->
-	lists:filter(fun(Elem) -> is_source(Elem) end,Liste). 
+	lists:filter(fun(Elem) -> is_source(Elem) and is_not_test(Elem) end,Liste). 
 
 is_source(File) ->
 	case string:str(File, ".erl") of
@@ -36,6 +36,13 @@ is_source(File) ->
 		_ ->
 			true
 	end.
+	
+is_not_test(File) ->
+	case string:str(File, "test") of
+		0 -> true;
+		_ -> false
+	end.
+	
 	
 make_abs(Path, Liste) ->
 	lists:flatmap(fun(Elem) -> [Path++"/"++Elem] end, Liste).
