@@ -61,7 +61,7 @@ getattr(Element, AttrName) ->
 %% Acts as iterator by returning the "rest" of
 %% the element list.
 %%
-%% @spec getattrvalue(Elements, AttrName) -> {error, Reason} | [{value, Value}, {rest, Rest}]
+%% @spec getattrvalue(Elements, AttrName) -> {error, Reason} | [Result]
 %% Elements = list()
 %% AttrName = atom()
 %% Rest=list()
@@ -105,7 +105,7 @@ extractvalue(Attr) ->
 %%
 %% Useful as iterator.
 %%
-%% @spec getvalue(Elements) -> {error, Reason} | [{value, Value}, {rest,Rest_of_elements}]
+%% @spec getvalue(Elements) -> {error, Reason} | [Result]
 %%
 %% @private
 getvalue(Elements) when is_list(Elements) ->

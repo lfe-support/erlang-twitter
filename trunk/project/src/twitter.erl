@@ -30,7 +30,6 @@
 		 start/0,
 		 start_link/0,
 		 stop/0,
-		 req/5, req/6,
 		 daemon_api/1
 		 ]).
 
@@ -131,55 +130,6 @@ loop() ->
 
 
 
-%% ----------------------                     ------------------------------
-%%%%%%%%%%%%%%%%%%%%%%%%% REQUEST DISPATCHING %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% ----------------------                     ------------------------------
-
-
-
-%% @spec req(ReplyDetails, Auth, Method, MandatoryParams, OptionalParams) -> ok | error
-%% where
-%%		ReplyDetails = {From, Context}
-%%			From = pid()
-%%			Context = atom()
-%%		Auth = {auth, Username, Password}
-%%			Username = string()
-%%			Password = string()
-%%		Method = atom()
-%%		MandatoryParams = [] | [{Key,Value}]
-%%		OptionalParams  = [] | [{Key, Value}]
-%% @doc
-%% The parameter 'From'
-%%
-req(ReplyDetails, Auth, Method, MandatoryParams, OptionalParams) ->
-	Ret = ?MODULE ! {request, ReplyDetails, Auth, Method, MandatoryParams, OptionalParams},
-	case Ret of
-		{request, ReplyDetails, Auth, Method, MandatoryParams, OptionalParams} ->
-			ok;
-		_ ->
-			error
-	end.
-
-%% @spec req(ReplyDetails, Timeout, Auth, Method, MandatoryParams, OptionalParams) -> ok | error
-%% where
-%%		ReplyDetails = {From, Context}
-%%			From = pid()
-%%			Context = atom()
-%%		Timeout = integer()
-%%		Auth = {auth, Username, Password}
-%%			Username = string()
-%%			Password = string()
-%%		Method = atom()
-%%		MandatoryParams = [] | [{Key,Value}]
-%%		OptionalParams  = [] | [{Key, Value}]
-req(ReplyDetails, Timeout, Auth, Method, MandatoryParams, OptionalParams) ->
-	Ret = ?MODULE ! {request, ReplyDetails, Timeout, Auth, Method, MandatoryParams, OptionalParams},
-	case Ret of
-		{request, ReplyDetails, Timeout, Auth, Method, MandatoryParams, OptionalParams} ->
-			ok;
-		_ ->
-			error
-	end.
 
 
 
@@ -265,7 +215,7 @@ test() ->
 	Username=os:getenv("twitter_username"),
 	Password=os:getenv("twitter_password"),
 	%%Param=os:getenv("twitter_param"),
-	req(undefined, {auth, Username, Password}, statuses.user_timeline, [], []).
+	?TAPI:req(undefined, {auth, Username, Password}, statuses.user_timeline, [], []).
 
 %% @private
 %% @hidden
@@ -273,12 +223,12 @@ test_update() ->
 	Username=os:getenv("twitter_username"),
 	Password=os:getenv("twitter_password"),
 	Param=os:getenv("twitter_param"),
-	req(undefined, {auth, Username, Password}, statuses.update, [{status, Param}], []).
+	?TAPI:req(undefined, {auth, Username, Password}, statuses.update, [{status, Param}], []).
 
 %% @private
 %% @hidden
 test_bad() ->
 	Username=os:getenv("twitter_username"),
 	Password=os:getenv("twitter_password"),
-	req(undefined, {auth, Username, Password}, bad.method, [], []).
+	?TAPI:req(undefined, {auth, Username, Password}, bad.method, [], []).
 	

@@ -1,2 +1,3 @@
 {packages,[]}.
-{modules,[tools,twitter]}.
+{modules,[twitter,twitter_api,twitter_mng,twitter_req,twitter_tools,
+          twitter_xml]}.

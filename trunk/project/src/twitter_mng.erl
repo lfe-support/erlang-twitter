@@ -37,7 +37,7 @@ load_config() ->
 %% The 'terms' should have already been 'sanitized'.
 %% @spec extract_config(Config) -> {ok, Config} | {error, Reason}
 %%
-%% Config = [Term()]
+%% Config = list()
 %%
 %% @private
 extract_config(Config) ->

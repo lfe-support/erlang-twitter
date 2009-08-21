@@ -1,14 +1,68 @@
 %% Author: Jean-Lou Dupont
 %% Created: 2009-08-20
 %% Description: Twitter API
+%%
 -module(twitter_api).
 
 -compile(export_all).
 
+-export([
+		 req/5, req/6
+		 ]).
+
 %%
 %% Macros
 %%
+-define(SERVER, twitter).
 -define(REQ, twitter_req).
+
+
+%% ----------------------                     ------------------------------
+%%%%%%%%%%%%%%%%%%%%%%%%% REQUEST DISPATCHING %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% ----------------------                     ------------------------------
+
+
+%% @doc Request dispatching.
+%% The parameter 'From' identifies the recipient 'server' whilst the 'Context'
+%%  parameter serves as identifier in the response to the server. The response
+%%  format is as follows:
+%%  ```
+%%    {Context, Message}
+%%  '''
+%%
+%% @spec req(ReplyDetails, Auth, Method, MandatoryParams, OptionalParams) -> ok | error
+%% where
+%%		ReplyDetails = {From, Context}
+%%			From = atom() | pid() 
+%%			Context = atom()
+%%		Auth = {auth, Username, Password}
+%%			Username = string()
+%%			Password = string()
+%%		Method = atom()
+%%		MandatoryParams = nil() | [tuple()]
+%%		OptionalParams  = nil() | [tuple()]
+%%
+%%
+req(ReplyDetails, Auth, Method, MandatoryParams, OptionalParams) ->
+	Ret = ?SERVER ! {request, ReplyDetails, Auth, Method, MandatoryParams, OptionalParams},
+	case Ret of
+		{request, ReplyDetails, Auth, Method, MandatoryParams, OptionalParams} ->
+			ok;
+		_ ->
+			error
+	end.
+
+%% @doc
+%% Same as req/5 expect for the Timeout parameter expressed in milliseconds.
+req(ReplyDetails, Timeout, Auth, Method, MandatoryParams, OptionalParams) ->
+	Ret = ?SERVER ! {request, ReplyDetails, Timeout, Auth, Method, MandatoryParams, OptionalParams},
+	case Ret of
+		{request, ReplyDetails, Timeout, Auth, Method, MandatoryParams, OptionalParams} ->
+			ok;
+		_ ->
+			error
+	end.
+
 
 
 
