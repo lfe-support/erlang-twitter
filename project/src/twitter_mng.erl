@@ -4,11 +4,19 @@
 -module(twitter_mng).
 -compile(export_all).
 
+-export([
+		 get_param/2, put_param/2
+		 ]).
+
 %%
 %% Macros
 %%
 -define(CONFIG_FILENAME, ".twitter").
 -define(TOOLS, twitter_tools).
+
+%% Blacklist of parameters that cannot be
+%% changed through the configuration file.
+-define(PARAMS_BLACKLIST, [user, pass]).
 
 
 %% Loads the config file and
@@ -46,6 +54,9 @@ extract_config(Config) ->
 		{pass, Pass}=?TOOLS:kfind(pass, Config),
 		put(user, User),
 		put(pass, Pass),
+		
+		%% insert config parameters in the process dictionary
+		extract_params(Config),
 		{ok, Config}
 	catch
 		X:Y ->
@@ -60,6 +71,44 @@ extract_config() ->
 	{ok, Config} = read_config(),
 	extract_config(Config).
 
+
+
+extract_params([]) ->
+	ok;
+
+%% @doc Extracts the {param, ...} parameters
+%%      from the config list and 'puts'
+%%      them in the process dictionary whilst
+%%      respecting any 'blacklisted' elements.
+%%
+extract_params(Config) when is_list(Config)->
+	[Param|Rest] = Config,
+	try
+		{param, ParamName, Value} = Param,
+		safe_put_param(ParamName, Value)
+	catch
+		_:_ ->
+			{error, {invalid_param, Param}}
+	end,
+	extract_params(Rest).
+
+
+safe_put_param(Name, Value) ->
+	Blacklisted=lists:member(Name, ?PARAMS_BLACKLIST),
+	put_param(Blacklisted, Name, Value).
+	
+
+put_param(Name, Value) ->
+	put_param(false, Name, Value).
+
+put_param(true, Name, _Value) ->
+	{error, {parameter_blacklisted, Name}};
+
+put_param(false, Name, Value) ->
+	put({param, Name}, Value).
+
+get_param(Name, Default) ->
+	?TOOLS:getvar({param,Name}, Default).
 
 
 %% Reads the configuration file
@@ -113,7 +162,28 @@ process_config(Terms, true, true) ->
 	{ok, Terms}.
 
 
+%% Returns all the {param, ...} parameters
+%% from the process dictionary.
+%%
+get_dicparams() ->
+	List=get(),
+	get_dicparams(List).
 
+get_dicparams([]) ->
+	[];
+
+get_dicparams(List) when is_list(List) ->
+	Fun = fun(Elem) ->
+				case Elem of
+					{{param, _Name}, _Value} -> true;
+					_ -> false
+				end
+	end,
+	lists:filter(Fun, List).
+
+						
+	
+	
 
 
 

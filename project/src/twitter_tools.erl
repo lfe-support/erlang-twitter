@@ -42,6 +42,10 @@
 		 extract/2
 		 ]).
 
+-export([
+		 getvar/2, getvar/3
+		 ]).
+
 %%
 %% API Functions
 %%
@@ -298,3 +302,22 @@ extract(Result, http.code.text) ->
 	{{_Version, _Code, CodeText}, _Headers, _Body} = Result,
 	CodeText.
 	
+
+%% @doc Retrieves a Value from a named variable in the process dictionary or
+%%      returns a Default value in the event it is 'undefined'.
+%%
+%% @spec getvar(VarName, Default) -> Value | Default
+%%
+%% Value = term()
+%% Default = term()
+%%
+getvar(VarName, Default) ->
+	VarValue=get(VarName),
+	getvar(VarName, VarValue, Default).
+
+getvar(VarName, undefined, Default) ->
+	put(VarName, Default),
+	Default;
+
+getvar(_VarName, VarValue, _Default) ->
+	VarValue.
