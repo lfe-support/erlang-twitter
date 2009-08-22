@@ -19,11 +19,9 @@
 %%
 process(Response) ->
 	try 
-		
 		{Xml, _Rest}=xmerl_scan:string(Response),
 		Elements=Xml#xmlElement.content,
 		{elements, Elements}
-	
 	catch
 		_X:_Y ->
 			{error, cannot_parse}
