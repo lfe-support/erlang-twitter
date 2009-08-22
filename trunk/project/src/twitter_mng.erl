@@ -1,6 +1,14 @@
 %% Author: Jean-Lou Dupont
 %% Created: 2009-08-21
 %% Description: Management functions
+%%
+%% @doc
+%%  ==Required Parameters==
+%%  <ul>
+%%   <li>user</li>
+%%   <li>pass</li>
+%%  </ul>
+%%
 -module(twitter_mng).
 -compile(export_all).
 
@@ -13,9 +21,14 @@
 %%
 -define(CONFIG_FILENAME, ".twitter").
 -define(TOOLS, twitter_tools).
+-define(DEFAULTS, twitter_defaults).
 
-%% Blacklist of parameters that cannot be
-%% changed through the configuration file.
+
+%%     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+%% >>  Blacklist of parameters that cannot be   <<
+%% >>  changed through the configuration file   <<
+%% >>  {param, Key, Value} pattern.             <<
+%%     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 -define(PARAMS_BLACKLIST, [user, pass]).
 
 
@@ -26,9 +39,11 @@
 
 	   
 
-%% Loads the config file and
-%% updates the local variables &
-%% config state.
+%% Loads the config file and updates the local variables &
+%% config state. 
+%%
+%% The function loads all the Default configuration parameters first
+%% and updates/complements them with the parameters on file.
 %%
 %% @spec load_config() -> {error, Reason} | {ok, Config}
 %%
@@ -41,6 +56,7 @@ load_config() ->
 			{error, Reason};
 		
 		{ok, Config} ->
+			?DEFAULTS:put_defaults(),
 			Result=extract_config(Config),
 			put(config_state, Result),
 			Result
@@ -143,7 +159,10 @@ read_config(Root, Filename) ->
 	end.
 
 %% Process config file looking for
-%% missing parameters
+%% missing parameters. The only required parameters
+%% are, at the moment, the following:
+%%  1) user
+%%  2) pass
 %%
 %% @spec process_config(Terms) -> {error, Reason} | {ok, Terms}
 %%

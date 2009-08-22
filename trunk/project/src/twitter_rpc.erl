@@ -7,8 +7,9 @@
 %%
 %% MACROS
 %%
--define(SUPPORTED_CMDS, [getapiversion, reload, status, getstats, getparams, getcmds]).
+-define(SUPPORTED_CMDS, [getapiversion, reload, status, getstats, getparams, getcmds, getparamsdesc]).
 -define(API_VERSION, 1).
+-define(DEFAULTS,   twitter_defaults).
 -define(MNG,        twitter_mng).
 -define(SERVER,     twitter).
 -define(TIMEOUT,    1000).
@@ -53,6 +54,14 @@ handle_rpc(ReplyTo, _FromNode, RC, getparams) ->
 %%
 handle_rpc(ReplyTo, _FromNode, RC, getapiversion) ->
 	rpc_reply(ReplyTo, {RC, ?API_VERSION});
+
+%% Retrieves the help information for all
+%% configurable parameters of the daemon
+%%
+handle_rpc(ReplyTo, _FromNode, RC, getparamsdesc) ->
+	Descs=?DEFAULTS:descriptions(),
+	rpc_reply(ReplyTo, {RC, Descs});
+
 
 %% CATCH-ALL
 %%
