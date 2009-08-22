@@ -18,12 +18,16 @@
 %%
 %% Macros 
 %%
--define(SERVER,twitter).
--define(TOOLS, twitter_tools).
--define(REQ,   twitter_req).
--define(TAPI,  twitter_api).
--define(MNG,   twitter_mng).
--define(RPC,   twitter_rpc).
+-define(SERVER, twitter).
+-define(TOOLS,  twitter_tools).
+-define(REQ,    twitter_req).
+-define(TAPI,   twitter_api).
+-define(MNG,    twitter_mng).
+-define(RPC,    twitter_rpc).
+
+%% MSWITCH busses to subscribe to
+-define(BUSSES,        [notif]).
+-define(MSWITCH_HEART, 30*1000).
 
 %%
 %% Exported Functions
@@ -32,7 +36,7 @@
 		 start/0,
 		 start_link/0,
 		 stop/0,
-		 daemon_api/1
+		 daemon_api/2
 		 ]).
 
 
@@ -40,7 +44,8 @@
 
 %% LOCAL
 -export([
-		 loop/0
+		 loop/0,
+		 inbox/1
 		 ]).
 
 
@@ -86,7 +91,8 @@ stop() ->
 loop() ->
 	receive
 		start ->
-			?MNG:load_config();
+			?MNG:load_config(),
+			do_sync();
 		
 		stop ->
 			exit(ok);
@@ -96,9 +102,13 @@ loop() ->
 		%% Messages ending up here are (usually ;-)
 		%% sent through using the 'rpc' function.
 		%%
-		{rpc, ReplyTo, {FromNode, Q}} ->
-			?RPC:handle_rpc(ReplyTo, FromNode, Q);
+		{rpc, ReplyTo, {FromNode, ReplyContext, Q}} ->
+			?RPC:handle_rpc(ReplyTo, FromNode, ReplyContext, Q);
 
+		{mswitch, _From, Message} ->
+			?MNG:inc_stat(mswitch_message_received),
+			io:format("mswitch:msg: ~p~n", [Message]);
+		
 		
 		{request, ReplyDetails, Auth, Method, MandatoryParams, OptionalParams} ->
 			?TAPI:request(ReplyDetails, ?TIMEOUT, Auth, Method, MandatoryParams, OptionalParams);
@@ -122,6 +132,10 @@ loop() ->
 			erase({requestid, RequestId}),
 			?REQ:reply(ReturnDetails, {response, Result})
 		
+	after ?MSWITCH_HEART ->
+			
+			do_sync()
+	
 	end,
 	loop().
 
@@ -134,23 +148,49 @@ loop() ->
 %%%%%%%%%%%%%%%%%%%%%%%%% DAEMON MANAGEMENT %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% ----------------------                   ------------------------------
 
-%%
-%% @spec daemon_api(status) -> {pid, Pid}
-%%
-%% @private
-daemon_api(status) ->
-	{pid, os:getpid()};
 
-daemon_api(Command) ->
+daemon_api(ReplyContext, Command) ->
 	case ?RPC:rpc_validate_command(Command) of
 		true ->
-			?RPC:rpc(Command);
+			?RPC:rpc(ReplyContext, Command);
 		_ ->
 			{error, invalid_command}
 	end.
 
 
+%% ----------------------         ------------------------------
+%%%%%%%%%%%%%%%%%%%%%%%%% MSWITCH %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% ----------------------         ------------------------------
+
+%% Performs synchronization with MSWITCH
+%%
+do_sync() ->
+	try
+		{_Pid, ok}=mswitch:subscribe({?MODULE, inbox, ?SERVER}, ?BUSSES),
+		ok
+	catch
+		error:undef ->
+			?MNG:inc_stat(mswitch_not_found),
+			error;
+
+		_:_ ->
+			?MNG:inc_stat(mswitch_node_not_found),
+			error
+	end.
+
+
+%% Performs the MSWITCH subscriptions
+%%
+do_subscribe() ->
+	ok.
+
+do_heart() ->
+	ok.
 
 
 
-
+%% Mailbox
+%%
+inbox({FromNode, Server, Message}) ->
+	%%io:format("inbox: FromNode[~p] Server[~p] Message[~p]~n",[FromNode, Server, Message]),
+	Server ! {mswitch, FromNode, Message}.

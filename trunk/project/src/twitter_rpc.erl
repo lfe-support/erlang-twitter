@@ -7,50 +7,56 @@
 %%
 %% MACROS
 %%
--define(SUPPORTED_CMDS, [getapiversion, reload, status, getstats, getparams]).
+-define(SUPPORTED_CMDS, [getapiversion, reload, status, getstats, getparams, getcmds]).
 -define(API_VERSION, 1).
 -define(MNG,        twitter_mng).
 -define(SERVER,     twitter).
 -define(TIMEOUT,    1000).
 
-
+getcmds() ->
+	?SUPPORTED_CMDS.
 
 %% ----------------------              ------------------------------
 %%%%%%%%%%%%%%%%%%%%%%%%% RPC handling %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% ----------------------              ------------------------------
 
+%% Retrieves the Pid of the daemon
+%%
+handle_rpc(ReplyTo, _FromNode, RC, status) ->
+	rpc_reply(ReplyTo, {RC, os:getpid()});
+
 %% Retrieves the supported commands through the RPC interface
 %%
-handle_rpc(ReplyTo, _FromNode, getcmds) ->
-	rpc_reply(ReplyTo, {cmds, ?SUPPORTED_CMDS});
+handle_rpc(ReplyTo, _FromNode, RC, getcmds) ->
+	rpc_reply(ReplyTo, {RC, ?SUPPORTED_CMDS});
 
 
 %% Reloads the configuration from file
 %%
-handle_rpc(ReplyTo, _FromNode, reload) ->
+handle_rpc(ReplyTo, _FromNode, RC, reload) ->
 	Result=?MNG:load_config(),
-	rpc_reply(ReplyTo, Result);
+	rpc_reply(ReplyTo, {RC, Result});
 
 %% Retrieves the statistics
 %%
-handle_rpc(ReplyTo, _FromNode, getstats) ->
+handle_rpc(ReplyTo, _FromNode, RC, getstats) ->
 	Stats=?MNG:get_stats(),
-	rpc_reply(ReplyTo, {stats, Stats});
+	rpc_reply(ReplyTo, {RC, Stats});
 
 %% Retrieves the parameters currently in-force
 %%
-handle_rpc(ReplyTo, _FromNode, getparams) ->
+handle_rpc(ReplyTo, _FromNode, RC, getparams) ->
 	Params=?MNG:get_dicparams(),
-	rpc_reply(ReplyTo, {params, Params});
+	rpc_reply(ReplyTo, {RC, Params});
 
 %% Retrieves the API version
 %%
-handle_rpc(ReplyTo, _FromNode, getapiversion) ->
-	rpc_reply(ReplyTo, {apiversion, ?API_VERSION});
+handle_rpc(ReplyTo, _FromNode, RC, getapiversion) ->
+	rpc_reply(ReplyTo, {RC, ?API_VERSION});
 
 %% CATCH-ALL
 %%
-handle_rpc(ReplyTo, _, _) ->
+handle_rpc(ReplyTo, _, _, _) ->
 	rpc_reply(ReplyTo, {error, invalid_request}).
 
 
@@ -77,11 +83,11 @@ rpc_reply(ReplyTo, Message) ->
 
 
 %% @private
-rpc(Q) ->
+rpc(ReplyContext, Q) ->
 	FromNode=node(),
 	%%io:format("call: from[~p] Q[~p]~n", [FromNode, Q]),
 	%%?TOOLS:msg("rpc: From[~p] Message[~p]", [FromNode, Q]),
-	?SERVER ! {rpc, self(), {FromNode, Q}},
+	?SERVER ! {rpc, self(), {FromNode, ReplyContext, Q}},
 	receive
 		{rpc_reply, Reply} ->
 			Reply;
