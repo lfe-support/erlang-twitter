@@ -7,7 +7,7 @@
 %%
 %% MACROS
 %%
--define(SUPPORTED_CMDS, [getapiversion, reload, status, getstats, getparams, getcmds, getparamsdesc]).
+-define(SUPPORTED_CMDS, [getapiversion, reload, status, getstats, getparams, getcmds, getparamsdesc, getblacklist]).
 -define(API_VERSION, 1).
 -define(DEFAULTS,   twitter_defaults).
 -define(MNG,        twitter_mng).
@@ -61,6 +61,14 @@ handle_rpc(ReplyTo, _FromNode, RC, getapiversion) ->
 handle_rpc(ReplyTo, _FromNode, RC, getparamsdesc) ->
 	Descs=?DEFAULTS:descriptions(),
 	rpc_reply(ReplyTo, {RC, Descs});
+
+%% Returns the list of blacklisted parameters
+%%
+handle_rpc(ReplyTo, _FromNode, RC, getblacklist) ->
+	Descs=?DEFAULTS:blacklist(),
+	rpc_reply(ReplyTo, {RC, Descs});
+
+
 
 
 %% CATCH-ALL
