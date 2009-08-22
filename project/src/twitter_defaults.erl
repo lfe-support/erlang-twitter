@@ -87,7 +87,7 @@ put_defaults(Defaults) ->
 %%
 %% Only integer values are validated.
 %%
-%% @spec validate_param_limit(Key, Value) -> ok | too_low | too_high
+%% @spec validate_param_limit(Key, Value) -> ok | too_low | too_high | invalid
 %%
 validate_param_limit(Key, Value) ->
 	%% builds a min & max atom for querying the table
@@ -128,14 +128,18 @@ resolve_cmp(R1, ok) ->	R1.
 
 
 
-cmp(min, Value, Target) ->
+cmp(min, Value, Target) when is_integer(Value), is_integer(Target) ->
 	case Value > Target of
 		false -> too_low;
 		_ ->	ok
 	end;
 
-cmp(max, Value, Target) ->
+cmp(max, Value, Target) when is_integer(Value), is_integer(Target) ->
 	case Value > Target of
 		false -> ok;
 		_ ->	too_high
-	end.
+	end;
+
+cmp(_, _, _) ->
+	invalid.
+
