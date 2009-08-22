@@ -24,14 +24,6 @@
 -define(DEFAULTS, twitter_defaults).
 
 
-%%     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-%% >>  Blacklist of parameters that cannot be   <<
-%% >>  changed through the configuration file   <<
-%% >>  {param, Key, Value} pattern.             <<
-%%     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
--define(PARAMS_BLACKLIST, [user, pass]).
-
-
 
 %% ----------------------        ------------------------------
 %%%%%%%%%%%%%%%%%%%%%%%%% CONFIG %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -117,7 +109,7 @@ extract_params(Config) when is_list(Config)->
 
 
 safe_put_param(Name, Value) ->
-	Blacklisted=lists:member(Name, ?PARAMS_BLACKLIST),
+	Blacklisted=lists:member(Name, ?DEFAULTS:getblacklist()),
 	put_param(Blacklisted, Name, Value).
 	
 

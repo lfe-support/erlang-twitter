@@ -105,6 +105,7 @@ loop() ->
 		{rpc, ReplyTo, {FromNode, ReplyContext, Q}} ->
 			?RPC:handle_rpc(ReplyTo, FromNode, ReplyContext, Q);
 
+		%% Messages received 
 		{mswitch, _From, Message} ->
 			?MNG:inc_stat(mswitch_message_received),
 			io:format("mswitch:msg: ~p~n", [Message]);
