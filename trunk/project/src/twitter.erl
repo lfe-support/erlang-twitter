@@ -19,6 +19,7 @@
 %% Macros 
 %%
 -define(SERVER, twitter).
+-define(LOG,    twitter_log).
 -define(TOOLS,  twitter_tools).
 -define(REQ,    twitter_req).
 -define(TAPI,   twitter_api).
@@ -28,6 +29,7 @@
 %% MSWITCH busses to subscribe to
 -define(BUSSES,        [notif]).
 -define(MSWITCH_HEART, 30*1000).
+-define(TIMER_CHECK,   60*1000).
 
 %%
 %% Exported Functions
@@ -92,6 +94,7 @@ loop() ->
 	receive
 		start ->
 			?MNG:load_config(),
+			?LOG:init(),
 			do_sync();
 		
 		stop ->
@@ -133,6 +136,7 @@ loop() ->
 			erase({requestid, RequestId}),
 			?REQ:reply(ReturnDetails, {response, Result})
 		
+	%% @TODO precaution for dead-timer...
 	after ?MSWITCH_HEART ->
 			
 			do_sync()

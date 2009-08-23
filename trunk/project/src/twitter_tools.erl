@@ -241,18 +241,14 @@ kfind(Key, List) ->
 	case erlang:is_builtin(lists, keyfind, 3) of
 		true  ->
 			case lists:keyfind(Key,1,List) of
-				false ->
-					{};
-				Tuple ->
-					Tuple
+				false -> {};
+				Tuple -> Tuple
 			end;
 
 		false ->
 			case lists:keysearch(Key,1,List) of
-				{value, Value} ->
-					Value;
-				_ ->
-					{}
+				{value, Value} -> Value;
+				_              -> {}
 			end
 	end.
 
@@ -263,10 +259,8 @@ kfind(Key, [], Default) ->
 kfind(Key, List, Default) ->
 	Ret=kfind(Key, List),
 	case Ret of
-		false ->
-			{Key, Default};
-		{Key, Value} ->
-			{Key, Value}
+		false        -> {Key, Default};
+		{Key, Value} ->	{Key, Value}
 	end.
 
 
