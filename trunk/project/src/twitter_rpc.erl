@@ -8,7 +8,7 @@
 %% MACROS
 %%
 -define(SUPPORTED_CMDS, [getapiversion, reload, status, getstats, getparams, getcmds, getparamsdesc, getblacklist]).
--define(API_VERSION, 1).
+-define(API_VERSION, {1,0}).
 -define(DEFAULTS,   twitter_defaults).
 -define(MNG,        twitter_mng).
 -define(SERVER,     twitter).
