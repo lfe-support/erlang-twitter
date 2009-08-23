@@ -20,6 +20,9 @@ blacklist() ->
 [
 	user
 	,pass
+
+	%% Obviously, we do not want the user 
+	%% to change the permissible limits...
 	,refresh_mswitch_min
 	,refresh_mswitch_max
 ].
@@ -131,13 +134,13 @@ resolve_cmp(R1, ok) ->	R1.
 cmp(min, Value, Target) when is_integer(Value), is_integer(Target) ->
 	case Value > Target of
 		false -> too_low;
-		_ ->	ok
+		_     -> ok
 	end;
 
 cmp(max, Value, Target) when is_integer(Value), is_integer(Target) ->
 	case Value > Target of
 		false -> ok;
-		_ ->	too_high
+		_     -> too_high
 	end;
 
 cmp(_, _, _) ->
