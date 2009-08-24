@@ -184,3 +184,20 @@ do_policing(PreviousResult, Policer, Buckets, ReplyTo, PassMsg, DropMsg) when is
 
 
 
+%% @doc Retrieves from the process dictionary the
+%%		configuration information specific to a policer.
+%%
+%% The configuration information consists of:
+%%   BucketNames = [{policer.PolicerName.bucket1} | {policer.PolicerName.bucket2}]
+%%   
+%% A bucket configuration can be accessed through:
+%%   Tokens   = {bucket.BucketId.tokens}
+%%   Interval = {bucket.BucketId.interval}
+%%
+get_policer_config(PolicerName) ->
+	BucketName1=get_policer_bucket(PolicerName, 1),
+	BucketName2=get_policer_bucket(PolicerName, 2),
+	
+
+get_policer_bucket(PolicerName, BucketId) ->
+	Atom=?TOOLS:concat_atom(Po)
