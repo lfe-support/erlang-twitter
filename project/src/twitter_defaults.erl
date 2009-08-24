@@ -95,6 +95,7 @@ get_default(Key) ->
 
 
 %% @doc Puts all the default values in the process dictionary.
+%%		All Keys are stored using the pattern {param, Key}.
 %%
 %% @spec put_defaults() -> void()
 %%
@@ -112,6 +113,7 @@ put_defaults(Defaults) ->
 	put_defaults(Rest).
 
 
+
 %% @doc Validates a parameter against declared min/max limits.  
 %%		If a parameter does not have declared limits, 'ok' is returned.
 %%
@@ -119,7 +121,7 @@ put_defaults(Defaults) ->
 %%
 %% @spec validate_param_limit(Key, Value) -> ok | too_low | too_high | invalid
 %%
-validate_param_limit(Key, Value) ->
+validate_param_limit(Key, Value) when is_integer(Value) ->
 	%% builds a min & max atom for querying the table
 	Min=erlang:atom_to_list(Key)++"_min",
 	Max=erlang:atom_to_list(Key)++"_max",
@@ -127,7 +129,12 @@ validate_param_limit(Key, Value) ->
 	Maxa=erlang:list_to_atom(Max),
 	Pmin=?TOOLS:kfind(Mina, defaults()),
 	Pmax=?TOOLS:kfind(Maxa, defaults()),
-	validate_limit(Value, Pmin, Pmax).
+	validate_limit(Value, Pmin, Pmax);
+
+%% We only validate integers at the moment...
+validate_param_limit(_,_) ->
+	ok.
+
 
 %% No limits
 validate_limit(_Value, {}, {}) ->
@@ -172,4 +179,5 @@ cmp(max, Value, Target) when is_integer(Value), is_integer(Target) ->
 
 cmp(_, _, _) ->
 	invalid.
+
 
