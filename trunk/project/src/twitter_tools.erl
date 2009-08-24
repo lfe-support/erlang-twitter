@@ -44,7 +44,16 @@
 
 -export([
 		 getvar/1, getvar/2, getvar/3,
-		 add_to_var_list/2
+		 add_to_var_list/2,
+		 
+		 concat_atoms/2,
+		 to_atom/1,
+		 
+		 head/1,
+		 head_pair/2, head_pair/3,
+		 
+		 make_atom_from_list/1,  make_atom_from_list/2
+		
 		 ]).
 
 %%
@@ -315,8 +324,7 @@ getvar(VarName, Default) ->
 	VarValue=get(VarName),
 	getvar(VarName, VarValue, Default).
 
-getvar(VarName, undefined, Default) ->
-	put(VarName, Default),
+getvar(_VarName, undefined, Default) ->
 	Default;
 
 getvar(_VarName, VarValue, _Default) ->
@@ -341,3 +349,80 @@ add_to_var_list(VarName, Value) ->
 	put(VarName, NewList),
 	NewList.
 
+
+%% @doc Concatenates two atoms
+%%
+%% @spec concat_atoms(A1, A2) -> atom()
+%%
+concat_atoms(A1, A2) when is_atom(A1), is_atom(A2) ->
+	L1=erlang:atom_to_list(A1),
+	L2=erlang:atom_to_list(A2),
+	erlang:list_to_atom(L1++L2);
+
+concat_atoms(V1, V2) ->
+	A1=to_atom(V1),
+	A2=to_atom(V2),
+	concat_atoms(A1, A2).
+
+
+to_atom(V) when is_atom(V) -> V;
+to_atom(V) when is_list(V) -> erlang:list_to_atom(V);
+to_atom(V) when is_integer(V) ->
+	L=erlang:integer_to_list(V),
+	erlang:list_to_atom(L).
+
+	
+head([]) ->	[];
+head(Liste) when is_list(Liste) -> erlang:hd(Liste);
+head(_) -> [].
+
+
+%% @doc Retrieves the first two elements of a list
+%%
+%% @spec head_pair(List, DefaultSecond) -> {Pair, Rest}
+%% where
+%%	List=list()
+%%  DefaultSecond=atom() | string() | integer()
+%%	Pair=list()
+%%	Rest=list()
+%%
+head_pair([], _DefaultSecond) ->
+	{[],[]};
+
+head_pair(Liste, DefaultSecond) when is_list(Liste) ->
+	[First|Rest] = Liste,
+	head_pair(First, Rest, DefaultSecond).
+
+head_pair(First, [], DefaultSecond) ->
+	{[First, DefaultSecond], []};
+
+head_pair(First, [Second|Rest], _DefaultSecond) ->
+	{[First, Second], Rest}.
+	
+
+
+%% @doc Concatenates elements from the list
+%%		into one atom.
+%%
+%% @spec make_atom_from_list(List) -> Result
+%% where
+%%	List = [atom() | string()]
+%%  Result = list()
+%%
+make_atom_from_list(List) when is_list(List) ->
+	{HeadPair, Rest}=head_pair(List, ''),
+	make_atom_from_list(HeadPair, Rest).
+
+
+make_atom_from_list([First,Second], []) ->
+	concat_atoms(First, Second);
+
+
+make_atom_from_list([First, Second], [Third|Rest]) ->
+	Partial =concat_atoms(First, Second),
+	Partial2=concat_atoms(Partial, Third),
+	make_atom_from_list([Partial2|Rest]).
+
+
+	
+	

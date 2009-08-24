@@ -18,7 +18,7 @@
 %%
 -export([
 		 init/0, init/1,
-		 log/1,
+		 log/1, log/2,
 		 close/0
 		 ]).
 
@@ -59,7 +59,8 @@ init(LogFileName) ->
 	process_open(Ret2),
 	Ret2.
 
-
+%% @doc Records log open errors
+%%
 process_open({error, _Reason}) ->
 	?MNG:inc_stat(?STAT_OPEN_ERROR);
 
@@ -73,19 +74,30 @@ process_open(_) ->
 	?MNG:inc_stat(?STAT_OPEN_ERROR).
 
 
-
+%% @doc Log a message with 'info' severity
+%%
 log(Msg) ->
-	Log=get(log),
-	dolog(Log, Msg).
+	Logger=get(log),
+	dolog(info, Logger, Msg).
 
-dolog(undefined, _) ->
+%% @doc Log a message with specific severity
+%%
+log(Severity, Msg) ->
+	Logger=get(log),
+	dolog(Severity, Logger, Msg).
+
+
+
+dolog(_Severity, undefined, _) ->
 	?MNG:inc_stat(?STAT_LOG_ERROR);
 
-dolog(Log, Msg) ->
+dolog(Severity, Logger, Msg) ->
 	{{Year,Month,Day},{Hour,Min,Sec}} = calendar:now_to_datetime(erlang:now()),
-	FMsg=io_lib:format("~2B/~2B/~4B ~2B:~2.10.0B:~2.10.0B  ~s:  ~p~n",[Day, Month, Year,Hour,Min,Sec, ?DEFAULT_LOG, Msg]),
-	Ret=?LOG:balog(Log, FMsg),
+	FMsg=io_lib:format("~2B/~2B/~4B ~2B:~2.10.0B:~2.10.0B [~s] ~s:  ~p~n",[Day, Month, Year,Hour,Min,Sec, Severity, ?DEFAULT_LOG, Msg]),
+	Ret=?LOG:balog(Logger, FMsg),
 	record_result(Ret).
+
+
 
 record_result(ok) ->
 	ok;

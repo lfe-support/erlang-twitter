@@ -28,6 +28,15 @@ blacklist() ->
 
 	%% List of policers: provided just for debugging
 	,policers
+
+	%% Policer to Bucket Name associations
+	,'policer.mswitch_error.bucket1'
+	,'policer.mswitch_error.bucket2'
+
+	%% Policer intervals
+	,'bucket.bucket1.interval'
+	,'bucket.bucket2.interval'
+	
 ].
 
 
@@ -38,17 +47,25 @@ defaults() ->
 	,{threshold1,          25}
 
 	,{refresh_mswitch,     10*1000}
-	,{refresh_mswitch_min, 10*1000}
-	,{refresh_mswitch_max, 60*1000}
+	,{refresh_mswitch.min, 10*1000}
+	,{refresh_mswitch.max, 60*1000}
+
+	%%%%%%%%% POLICERS %%%%%%%%%%%%%%%%%%%%%%%%%
 
 	%% MSWITCH related
-	,{log_mswitch_error_minute,      1}
-	,{log_mswitch_error_minute_min,  1}
-	,{log_mswitch_error_minute_max,  2}
+	,{'policer.mswitch_error.bucket1', bucket1}
+	,{'policer.mswitch_error.bucket2', bucket2}
+	
+	,{'bucket.bucket1.tokens',         1}
+	,{'bucket.bucket1.tokens.min',   1}
+	,{'bucket.bucket1.tokens.max',   2}
+	,{'bucket.bucket1.interval',		 60*1000}
 
-	,{log_mswitch_error_day,         2}
-	,{log_mswitch_error_day_min,     1}
-	,{log_mswitch_error_day_max,     6}
+	,{'bucket.bucket2.tokens',         2}
+	,{'bucket.bucket2.tokens.min',   1}
+	,{'bucket.bucket2.tokens.max',   6}
+	,{'bucket.bucket2.interval',		 24*60*1000}
+	
 ].
 
 
@@ -69,16 +86,22 @@ descriptions() ->
 ].
 
 
+%--------------------------------------------
+%%%%%%%%%%%% POLICER RELATED %%%%%%%%%%%%%%%%
+%--------------------------------------------
+
 policers() ->
 [
- 
+ 	policer.mswitch_error
 ].
 
-%% @doc Retrieves the configuration for the policers
-%%		whilst respecting the configuration parameters.
-%%
-get_policers() ->
-	ok.
+policer_bucket_names() ->
+[
+ 	bucket1, bucket2
+].
+
+
+
 
 
 
@@ -128,8 +151,8 @@ validate_param_limit(_Key, undefined) ->
 %%
 validate_param_limit(Key, Value) when is_integer(Value) ->
 	%% builds a min & max atom for querying the table
-	Min=erlang:atom_to_list(Key)++"_min",
-	Max=erlang:atom_to_list(Key)++"_max",
+	Min=erlang:atom_to_list(Key)++".min",
+	Max=erlang:atom_to_list(Key)++".max",
 	Mina=erlang:list_to_atom(Min),
 	Maxa=erlang:list_to_atom(Max),
 	Pmin=?TOOLS:kfind(Mina, defaults()),
@@ -186,7 +209,7 @@ cmp(_, _, _) ->
 	invalid.
 
 
-%% @doc Retrieves the 'min' value for Key
+%% @doc Retrieves the 'min' value for Key in the Defaults
 %%
 %% @spec get_min(Key, Default) -> Value
 %% where
@@ -195,10 +218,10 @@ cmp(_, _, _) ->
 %%	Value=atom() | list() | undefined
 %%
 get_min(Key, Default) ->
-	get_special(min, Key, Default).
+	get_special(".min", Key, Default).
 	
 
-%% @doc Retrieves the 'max' value for Key
+%% @doc Retrieves the 'max' value for Key in the Defaults
 %%
 %% @spec get_max(Key, Default) -> Value
 %% where
@@ -207,7 +230,7 @@ get_min(Key, Default) ->
 %%	Value=atom() | list() | undefined
 %%
 get_max(Key, Default) ->
-	get_special(max, Key, Default).
+	get_special(".max", Key, Default).
 
 
 get_special(Pattern, Key, Default) when is_atom(Pattern) ->
@@ -218,13 +241,12 @@ get_special(Pattern, Key, Default) when is_list(Pattern) ->
 	Var=erlang:atom_to_list(Key)++Pattern,
 	Vara=erlang:list_to_atom(Var),
 	Result=?TOOLS:kfind(Vara, defaults()),
+	%%io:format("get_special: var:<~p> result: ~p~n",[Vara, Result]),	
 	case Result of
-		{Key, Value} ->	Value;
-		_            -> Default
+		{Vara, Value} -> Value;
+		_             -> Default
 	end.
 	
-
-
 
 
 	
