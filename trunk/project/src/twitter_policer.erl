@@ -3,27 +3,38 @@
 %% Description: TODO: Add description to policer
 -module(twitter_policer).
 
+-define(TOOLS, twitter_tools).
+-define(MNG,   twitter_mng).
 
 %%
 %% Exported Functions
 %%
 -export([
-		 create_token_policer/1,
+		 start/0,
+		 create_token_policer/2,
 		 police/4
 		 ]).
 
 %% Local functions
 -export([
-		 loop/1,
-		 do_policing/5
+		 loop/0,
+		 do_policing/6
 		 ]).
 
 %% TESTS
 -export([
-		 create_token_policer/0,
-		 test_police/1
 		 ]).
 
+
+start() ->
+	Pid=spawn_link(?MODULE, loop, []),
+	register(?MODULE, Pid),
+	{ok, Pid}.	
+
+%% @doc start the policer process iff not already started
+start_if_not()          -> start_if_not(erlang:whereis(?MODULE)).
+start_if_not(undefined) -> start();
+start_if_not(_)         -> ok.
 
 
 %% @doc Creates a token based policer
@@ -32,69 +43,79 @@
 %% @spec create_token_policer(Buckets) -> {ok, Pid}
 %% where
 %%  Buckets= Bucket() | [Bucket()]
-%%  @type Bucket = {Id, MaxTokens, PeriodDuration}
+%%  @type Bucket = {MaxTokens, PeriodDuration}
 %%  Id = atom() | string()     % unique identifier (used process dictionary)
 %%  MaxTokens = integer()
 %%  PeriodDuration = integer() % in milliseconds
 %%  
-create_token_policer(Buckets) ->
-	Pid=spawn(?MODULE, loop, [Buckets]),
-	Pid ! start,
-	{ok, Pid}.
+create_token_policer(Policer, Buckets) ->
+	start_if_not(),
+	?MODULE ! {create, Policer, Buckets}.
 
 
-%% 
+%% @doc Apply policing
+%%
+%% @spec police(Policer, ReplyTo, PassMsg, DropMsg) -> void()
+%% where
+%%	Policer = atom()  %%unique policer identifier
+%%	ReplyTo = pid()
+%%	PassMsg = tuple()
+%%  DropMsg = tuple()
+%%
 police(Policer, ReplyTo, PassMsg, DropMsg) ->
-	Policer ! {police, ReplyTo, PassMsg, DropMsg}.
+	?MODULE ! {police, Policer, ReplyTo, PassMsg, DropMsg}.
 
 
 %%
 %% Local Functions
 %%
 
-loop(Buckets) ->
+loop() ->
 	receive
-		{police, ReplyTo, PassMsg, DropMsg} ->
-			do_policing(pass, Buckets, ReplyTo, PassMsg, DropMsg);
+		{create, Policer, Buckets} ->
+			add_buckets(Policer, Buckets);
+		
+		{police, Policer, ReplyTo, PassMsg, DropMsg} ->
+			Buckets=?TOOLS:getvar({buckets, Policer}, []),
+			do_policing(pass, Policer, Buckets, ReplyTo, PassMsg, DropMsg);
 
 		stop ->
 			exit(ok)
 	end,
-	loop(Buckets).
+	loop().
 
+add_buckets(Policer, Buckets) ->
+	?TOOLS:add_to_var_list({param, policers}, Policer),
+	?TOOLS:add_to_var_list({buckets, Policer}, Buckets).
 
+	
 
 %% End of list
-do_policing(pass, [], ReplyTo, PassMsg, _) ->
+do_policing(pass, _Policer, [], ReplyTo, PassMsg, _) ->
 	case is_pid(ReplyTo) of
-		true ->
-			ReplyTo ! PassMsg;
-		_ ->
-			io:format("passed~n"),
-			pass
+		true ->	ReplyTo ! PassMsg;
+		_    -> pass
 	end;
 
 
 %% Stop recursion on first 'drop' decision
-do_policing(drop, _, ReplyTo, _, DropMsg) ->
+do_policing(drop, _Policer, _, ReplyTo, _, DropMsg) ->
 	case is_pid(ReplyTo) of
-		true ->
-			ReplyTo ! DropMsg;
-		_ ->
-			io:format("dropped~n"),
-			drop
+		true -> ReplyTo ! DropMsg;
+		_    -> drop
 	end;
 
-do_policing(pass, Bucket, _, _, _) when is_tuple(Bucket) ->
+
+do_policing(pass, Policer, Bucket, _, _, _) when is_tuple(Bucket) ->
 	
-	{Id, MaxTokens, Period} = Bucket,
+	{MaxTokens, Period} = Bucket,
 	CurrentTime=now(),
 	
 	%% retrieve start of interval
-	StartPeriod=base:getvar({start_period, Id}, CurrentTime),
+	StartPeriod=base:getvar({start_period, Policer}, CurrentTime),
 	
 	%% current token count
-	Tokens=base:getvar({tokens, Id}, 0),
+	Tokens=base:getvar({tokens, Policer}, 0),
 	
 	%% is interval finished?
 	Diff=timer:now_diff(CurrentTime, StartPeriod),
@@ -102,7 +123,7 @@ do_policing(pass, Bucket, _, _, _) when is_tuple(Bucket) ->
 	if 
 		Diff > Period ->
 			%% end of period... start a new one
-			put({start_period, Id}, CurrentTime),
+			put({start_period, Policer}, CurrentTime),
 			Tokens2=0,
 			ok;
 		
@@ -114,41 +135,28 @@ do_policing(pass, Bucket, _, _, _) when is_tuple(Bucket) ->
 	end,
 	
 	NewCount = Tokens2 + 1,
-	put({tokens, Id}, NewCount),
+	put({tokens, Policer}, NewCount),
 	
 	if 
 		NewCount > MaxTokens ->
 			%% Drop
-			io:format("drop: id: ~p, tokens: ~p~n", [Id, NewCount]),
+			%%io:format("drop: id: ~p, tokens: ~p~n", [Policer, NewCount]),
+			?MNG:inc_stat({policer, Policer, drop}),
 			drop;
 		
 		true ->
-			io:format("pass: id: ~p, tokens: ~p~n", [Id, NewCount]),
+			%%io:format("pass: id: ~p, tokens: ~p~n", [Policer, NewCount]),
+			?MNG:inc_stat({policer, Policer, pass}),
 			pass
 	end;
 
 
 
 
-do_policing(PreviousResult, Buckets, ReplyTo, PassMsg, DropMsg) when is_list(Buckets) ->
-	[Head|Tail] = Buckets,
-	Result = do_policing(PreviousResult, Head, ReplyTo, PassMsg, DropMsg),
-	do_policing(Result, Tail, ReplyTo, PassMsg, DropMsg).
+do_policing(PreviousResult, Policer, Buckets, ReplyTo, PassMsg, DropMsg) when is_list(Buckets) ->
+	[Bucket|Rest] = Buckets,
+	Result = do_policing(PreviousResult, Policer, Bucket, ReplyTo, PassMsg, DropMsg),
+	do_policing(Result, Policer, Rest, ReplyTo, PassMsg, DropMsg).
 
-
-
-
-%% =========================================
-%% Test API
-%% =========================================
-create_token_policer() ->
-	%% Dual Token
-	%% 2 in the 10 seconds interval
-	%%   up to 5 in 60 seconds interval
-	Buckets=[{bucket1, 2, 10*1000*1000}, {bucket2, 5, 60*1000*1000}],
-	create_token_policer(Buckets).
-
-test_police(Policer) ->
-	police(Policer, undefined, passed, dropped).
 
 
