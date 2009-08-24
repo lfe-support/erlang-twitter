@@ -18,13 +18,15 @@
 %%
 %% Macros 
 %%
--define(SERVER, twitter).
--define(LOG,    twitter_log).
--define(TOOLS,  twitter_tools).
--define(REQ,    twitter_req).
--define(TAPI,   twitter_api).
--define(MNG,    twitter_mng).
--define(RPC,    twitter_rpc).
+-define(DEFAULTS, twitter_defaults).
+-define(POLICER,  twitter_policer).
+-define(SERVER,   twitter).
+-define(LOG,      twitter_log).
+-define(TOOLS,    twitter_tools).
+-define(REQ,      twitter_req).
+-define(TAPI,     twitter_api).
+-define(MNG,      twitter_mng).
+-define(RPC,      twitter_rpc).
 
 %% MSWITCH busses to subscribe to
 -define(BUSSES,        [notif]).
@@ -94,7 +96,10 @@ loop() ->
 	receive
 		start ->
 			?MNG:load_config(),
+			
+			?POLICER:init(?DEFAULTS:get_policers()),
 			?LOG:init(),
+			
 			config_timer(),
 			do_sync();
 		

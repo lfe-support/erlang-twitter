@@ -25,6 +25,8 @@ blacklist() ->
 	%% to change the permissible limits...
 	,refresh_mswitch_min
 	,refresh_mswitch_max
+
+	%% List of policers: provided just for debugging
 	,policers
 ].
 
@@ -33,10 +35,20 @@ blacklist() ->
 defaults() ->
 [
 	{refresh_limit_status, 5*60*1000}
+	,{threshold1,          25}
+
 	,{refresh_mswitch,     10*1000}
 	,{refresh_mswitch_min, 10*1000}
 	,{refresh_mswitch_max, 60*1000}
-	,{threshold1,          25}
+
+	%% MSWITCH related
+	,{log_mswitch_error_minute,      1}
+	,{log_mswitch_error_minute_min,  1}
+	,{log_mswitch_error_minute_max,  2}
+
+	,{log_mswitch_error_day,         2}
+	,{log_mswitch_error_day_min,     1}
+	,{log_mswitch_error_day_max,     6}
 ].
 
 
@@ -57,7 +69,20 @@ descriptions() ->
 ].
 
 
-%% Retrieves the default Value for Var
+policers() ->
+[
+ 
+].
+
+%% @doc Retrieves the configuration for the policers
+%%		whilst respecting the configuration parameters.
+%%
+get_policers() ->
+	ok.
+
+
+
+%% @doc Retrieves the default Value for Var
 %%
 %% @spec get_default(Key) -> {Key, Value} | {}
 %% where
@@ -69,8 +94,7 @@ get_default(Key) ->
 	?TOOLS:kfind(Key, Defaults).
 
 
-%% Puts all the default values
-%% in the process dictionary.
+%% @doc Puts all the default values in the process dictionary.
 %%
 %% @spec put_defaults() -> void()
 %%
@@ -88,9 +112,8 @@ put_defaults(Defaults) ->
 	put_defaults(Rest).
 
 
-%% @doc Validates a parameter against
-%%  declared min/max limits.  If a parameter
-%%  does not have declared limits, 'ok' is returned.
+%% @doc Validates a parameter against declared min/max limits.  
+%%		If a parameter does not have declared limits, 'ok' is returned.
 %%
 %% Only integer values are validated.
 %%
