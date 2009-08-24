@@ -43,7 +43,8 @@
 		 ]).
 
 -export([
-		 getvar/2, getvar/3
+		 getvar/2, getvar/3,
+		 add_to_var_list/2
 		 ]).
 
 %%
@@ -315,3 +316,20 @@ getvar(VarName, undefined, Default) ->
 
 getvar(_VarName, VarValue, _Default) ->
 	VarValue.
+
+%% @doc Adds an item to an existing/new list
+%%
+%% @spec add_to_var_list(VarName, Value) -> list()
+%%
+add_to_var_list(VarName, Value) when is_list(Value) ->
+	List=getvar(VarName,[]),
+	NewList=List++Value,
+	put(VarName, NewList),
+	NewList;
+
+add_to_var_list(VarName, Value) ->
+	List=getvar(VarName,[]),
+	NewList=List++[Value],
+	put(VarName, NewList),
+	NewList.
+

@@ -25,6 +25,7 @@ blacklist() ->
 	%% to change the permissible limits...
 	,refresh_mswitch_min
 	,refresh_mswitch_max
+	,policers
 ].
 
 
