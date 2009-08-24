@@ -43,7 +43,7 @@
 		 ]).
 
 -export([
-		 getvar/2, getvar/3,
+		 getvar/1, getvar/2, getvar/3,
 		 add_to_var_list/2
 		 ]).
 
@@ -298,6 +298,11 @@ extract(Result, http.code.text) ->
 	CodeText.
 	
 
+
+getvar(VarName) ->
+	getvar(VarName, []).
+
+
 %% @doc Retrieves a Value from a named variable in the process dictionary or
 %%      returns a Default value in the event it is 'undefined'.
 %%
@@ -318,18 +323,21 @@ getvar(_VarName, VarValue, _Default) ->
 	VarValue.
 
 %% @doc Adds an item to an existing/new list
+%%      whilst filtering duplicates.
 %%
 %% @spec add_to_var_list(VarName, Value) -> list()
 %%
 add_to_var_list(VarName, Value) when is_list(Value) ->
 	List=getvar(VarName,[]),
-	NewList=List++Value,
+	FilteredList=List--Value,
+	NewList=FilteredList++Value,
 	put(VarName, NewList),
 	NewList;
 
 add_to_var_list(VarName, Value) ->
 	List=getvar(VarName,[]),
-	NewList=List++[Value],
+	FilteredList=List--[Value],
+	NewList=FilteredList++[Value],
 	put(VarName, NewList),
 	NewList.
 
