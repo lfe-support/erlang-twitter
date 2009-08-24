@@ -199,12 +199,29 @@ validate_config(KeyList) when is_list(KeyList) ->
 	validate_config(Rest);
 
 validate_config(Key) ->
-	Value=get_param(Key),
+	
+	%% unlikely to get an 'undefined' since
+	%% we should be parsing a valid Key !
+	Value=get_param(Key, undefined),
+	
 	Result=?DEFAULTS:validate_param_limit(Key, Value),
-	case Result of
-		ok -> ok;
-		_  -> not_ok
-	end.
+	validate_config(Key, Result).
+
+validate_config(_Key, ok) ->
+	ok;
+
+%% Traps 'invalid' atom amongst others of course...
+%%
+validate_config(Key, _) ->
+	Default=?DEFAULTS:get_min(Key, undefined),
+	validate_store_min(Key, Default).
+
+%% @TODO generate log error
+validate_store_min(Key, undefined) ->
+	ok;
+
+validate_store_min(Key, Default) ->
+	put_param(Key, Default).
 
 
 
