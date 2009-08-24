@@ -50,6 +50,9 @@ descriptions() ->
 	  	"Refresh interval (in ms) for synching with the mswitch."}
 	,{refresh_mswitch_min,
 	  	"Minimum refresh interval (in ms) for synching with the mswitch"}
+	,{refresh_mswitch_max,
+	  	"Maximum refresh interval (in ms) for synching with the mswitch"}
+
 ].
 
 

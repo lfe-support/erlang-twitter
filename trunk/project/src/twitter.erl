@@ -95,7 +95,11 @@ loop() ->
 		start ->
 			?MNG:load_config(),
 			?LOG:init(),
+			config_timer(),
 			do_sync();
+		
+		timer_tick ->
+			do_heart();
 		
 		stop ->
 			exit(ok);
@@ -136,17 +140,32 @@ loop() ->
 			erase({requestid, RequestId}),
 			?REQ:reply(ReturnDetails, {response, Result})
 		
-	%% @TODO precaution for dead-timer...
-	after ?MSWITCH_HEART ->
-			
-			do_sync()
-	
 	end,
 	loop().
 
 
+%% @doc Make sure that the timer is up & running
+%%      & reload configuration
+%%
+config_timer() ->
+	TimerRef=get(timer_ref),
+	
+	%% no exception is throwed if invalid
+	timer:cancel(TimerRef),
+	
+	%% Get interval
+	Interval=get({param, refresh_mswitch}),
+	
+	%% send 'timer_tick' message to self()
+	Result=timer:send_interval(Interval, timer_tick),
+	config_timer_handle_result(Result).
 
+config_timer_handle_result({ok, Tref}) ->
+	put(timer, Tref);
 
+config_timer_handle_result(_) ->
+	?MNG:inc_stat(error_timer_interval).
+	
 
 
 %% ----------------------                   ------------------------------
@@ -172,29 +191,57 @@ daemon_api(ReplyContext, Command) ->
 do_sync() ->
 	try
 		{_Pid, ok}=mswitch:subscribe({?MODULE, inbox, ?SERVER}, ?BUSSES),
-		ok
+		put(mswitch, found)
 	catch
 		error:undef ->
 			?MNG:inc_stat(mswitch_not_found),
+			put(mswitch, not_found),
 			error;
 
 		_:_ ->
 			?MNG:inc_stat(mswitch_node_not_found),
+			put(mswitch, not_found),
 			error
 	end.
 
-
-%% Performs the MSWITCH subscriptions
+%% @doc Heartbeat publication on mswitch bus 'heart'
 %%
-do_subscribe() ->
-	ok.
-
 do_heart() ->
+	State=get(mswitch),
+	case State of
+		found ->
+			%% we believe the mswitch is accessible
+			do_heart_publish();
+		_ ->
+			%% we didn't find it the last time around...
+			%% try this time
+			do_sync(),
+			do_heart_publish()
+	end.
+
+do_heart_publish() ->
+	try
+		{_Pid, ok}=mswitch:publish(heart, {twitter, now()}),
+		put(mswitch, found)
+	catch
+		error:undef ->
+			?MNG:inc_stat(mswitch_not_found),
+			put(mswitch, not_found),
+			error;
+
+		_:_ ->
+			?MNG:inc_stat(mswitch_node_not_found),
+			put(mswitch, not_found),
+			error
+	end.
+	
+
+do_log() ->
 	ok.
 
 
 
-%% Mailbox
+%% @doc MSWITCH Mailbox
 %%
 inbox({FromNode, Server, Message}) ->
 	%%io:format("inbox: FromNode[~p] Server[~p] Message[~p]~n",[FromNode, Server, Message]),
