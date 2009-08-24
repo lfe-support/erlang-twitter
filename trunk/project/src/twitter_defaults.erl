@@ -114,6 +114,11 @@ put_defaults(Defaults) ->
 
 
 
+
+validate_param_limit(_Key, undefined) ->
+	invalid;
+
+
 %% @doc Validates a parameter against declared min/max limits.  
 %%		If a parameter does not have declared limits, 'ok' is returned.
 %%
@@ -181,3 +186,45 @@ cmp(_, _, _) ->
 	invalid.
 
 
+%% @doc Retrieves the 'min' value for Key
+%%
+%% @spec get_min(Key, Default) -> Value
+%% where
+%%	Key=atom()
+%%	Default=atom() | integer()
+%%	Value=atom() | list() | undefined
+%%
+get_min(Key, Default) ->
+	get_special(min, Key, Default).
+	
+
+%% @doc Retrieves the 'max' value for Key
+%%
+%% @spec get_max(Key, Default) -> Value
+%% where
+%%	Key=atom()
+%%	Default=atom() | integer()
+%%	Value=atom() | list() | undefined
+%%
+get_max(Key, Default) ->
+	get_special(max, Key, Default).
+
+
+get_special(Pattern, Key, Default) when is_atom(Pattern) ->
+	Pat=erlang:atom_to_list(Pattern),
+	get_special(Pat, Key, Default);
+
+get_special(Pattern, Key, Default) when is_list(Pattern) ->
+	Var=erlang:atom_to_list(Key)++Pattern,
+	Vara=erlang:list_to_atom(Var),
+	Result=?TOOLS:kfind(Vara, defaults()),
+	case Result of
+		{Key, Value} ->	Value;
+		_            -> Default
+	end.
+	
+
+
+
+
+	
