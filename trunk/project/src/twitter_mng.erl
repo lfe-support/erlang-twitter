@@ -31,8 +31,7 @@
 
 	   
 
-%% Loads the config file and updates the local variables &
-%% config state. 
+%% @doc Loads the config file and updates the local variables & config state. 
 %%
 %% The function loads all the Default configuration parameters first
 %% and updates/complements them with the parameters on file.
@@ -50,9 +49,18 @@ load_config() ->
 		{ok, Config} ->
 			?DEFAULTS:put_defaults(),
 			Result=extract_config(Config),
+			validate_config(Config),
 			put(config_state, Result),
 			Result
 	end.
+
+%% @doc Debug only (probably)
+%%
+%% @private
+extract_config() ->
+	{ok, Config} = read_config(),
+	extract_config(Config).
+
 
 %% Extracts the configuration parameters
 %% from the Config terms.
@@ -72,19 +80,14 @@ extract_config(Config) ->
 		
 		%% insert config parameters in the process dictionary
 		extract_params(Config),
-		{ok, Config}
+		ok
 	catch
 		X:Y ->
-			%% just in case...
+			%% @TODO use the defined logger!
 			error_logger:error_msg("twitter: extract_config [~p:~p]~n", [X,Y]),
 			{error, {extracting_username, extracting_password}}
 	end.
 
-
-%% Debug only (probably)
-extract_config() ->
-	{ok, Config} = read_config(),
-	extract_config(Config).
 
 
 
@@ -102,6 +105,7 @@ extract_params(Config) when is_list(Config)->
 		{param, ParamName, Value} = Param,
 		safe_put_param(ParamName, Value)
 	catch
+		%% @TODO log errors!
 		_:_ ->
 			{error, {invalid_param, Param}}
 	end,
@@ -113,6 +117,8 @@ safe_put_param(Name, Value) ->
 	put_param(Blacklisted, Name, Value).
 	
 
+
+
 put_param(Name, Value) ->
 	put_param(false, Name, Value).
 
@@ -122,15 +128,19 @@ put_param(true, Name, _Value) ->
 put_param(false, Name, Value) ->
 	put({param, Name}, Value).
 
+
+
 get_param(Name, Default) ->
 	?TOOLS:getvar({param,Name}, Default).
 
 
-%% Reads the configuration file
+
+
+%% @doc Reads the configuration file
 %%
 %% @spec read_config() -> {error, Reason} | {ok, Terms}
 %% 
-%% Terms = list()
+%% Terms = [tuple()]
 %% Reason = atom()
 %%
 %% @private
@@ -150,6 +160,7 @@ read_config(Root, Filename) ->
 			process_config(Terms)
 	end.
 
+
 %% Process config file looking for
 %% missing parameters. The only required parameters
 %% are, at the moment, the following:
@@ -167,17 +178,34 @@ process_config(Terms) ->
 	Pfound=lists:keymember(pass, 1, Terms),
 	process_config(Terms, Ufound, Pfound).
 
-process_config(_Terms, false, false) ->
-	{error, {missing_username, missing_password}};
+process_config(_Terms, false, false) ->	{error, {missing_username, missing_password}};
+process_config(_Terms, true,  false) ->	{error, missing_password};
+process_config(_Terms, false, true)  ->	{error, missing_username};
+process_config(Terms,  true,  true)  ->	{ok, Terms}.
 
-process_config(_Terms, true, false) ->
-	{error, missing_password};
 
-process_config(_Terms, false, true) ->
-	{error, missing_username};
 
-process_config(Terms, true, true) ->
-	{ok, Terms}.
+validate_config([]) ->
+	ok;
+
+%% @doc Go through all the configuration parameters & validate
+%%
+%% @spec validate_config(KeyList) -> void()
+%% KeyList = list()
+%%
+validate_config(KeyList) when is_list(KeyList) ->
+	[Key|Rest] = KeyList,
+	validate_config(Key),
+	validate_config(Rest);
+
+validate_config(Key) ->
+	Value=get_param(Key),
+	Result=?DEFAULTS:validate_param_limit(Key, Value),
+	case Result of
+		ok -> ok;
+		_  -> not_ok
+	end.
+
 
 
 %% ----------------------        ------------------------------
@@ -216,6 +244,21 @@ get_dicclass(List, Class) when is_atom(Class)->
 
 get_dicclass(_,_) ->
 	{error, invalid_class}.
+
+
+%% @doc Retrieves & validates the Value associated with Key
+%% 		If the Value is an integer, it is validated iff
+%%		a 'min' and/or 'max' values are found in the defaults.
+%%		
+%% @spec get_validated(Key) -> Value
+%% where
+%%	Key = atom()
+%%	Value = atom() | list()
+%%
+get_validated(Class, Key) ->
+	ok.
+
+
 
 
 %% ----------------------       ------------------------------
