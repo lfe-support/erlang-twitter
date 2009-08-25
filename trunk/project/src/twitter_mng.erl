@@ -216,6 +216,7 @@ validate_config(Key, _) ->
 	Default=?DEFAULTS:get_min(Key, undefined),
 	validate_store_min(Key, Default).
 
+
 %% @TODO generate log error
 validate_store_min(_Key, undefined) ->
 	ok;
