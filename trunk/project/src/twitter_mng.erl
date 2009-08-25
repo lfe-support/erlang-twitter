@@ -25,7 +25,7 @@
 -define(CONFIG_FILENAME, ".twitter").
 -define(TOOLS,           twitter_tools).
 -define(DEFAULTS,        twitter_defaults).
--define(LOG,             twitter_policed_logger).
+-define(LOG,             twitter_log).
 
 
 
@@ -59,7 +59,7 @@ load_config(Config) ->
 load_config_file() ->
 	case read_config() of
 		{error, Reason} ->
-			?LOG:log(config, error, "File error reading configuration file, reason: ", [Reason]),
+			?LOG:log(error, "File error reading configuration file, reason: ", [Reason]),
 			put(config_state, {error, Reason}),
 			{error, Reason};
 		
@@ -98,7 +98,7 @@ extract_config(Config) ->
 		put(pass, Pass)
 	catch
 		_X:_Y ->
-			?LOG:log(config, error, "Username and/or Password parameters not found/invalid."),
+			?LOG:log(error, "Username and/or Password parameters not found/invalid."),
 			{error, {extracting_username, extracting_password}}
 	end,
 	try
@@ -107,7 +107,7 @@ extract_config(Config) ->
 		ok
 	catch
 		_:_ ->
-			?LOG:log(config, error, "Parameters extraction from configuration file.")
+			?LOG:log(error, "Parameters extraction from configuration file.")
 	end.
 
 
@@ -128,7 +128,7 @@ extract_params(Config) when is_list(Config)->
 		safe_put_param(ParamName, Value)
 	catch
 		_:_ ->
-			?LOG:log(config, error, "Invalid parameter: ~p", [Param]),
+			?LOG:log(error, "Invalid parameter: ", [Param]),
 			{error, {invalid_param, Param}}
 	end,
 	extract_params(Rest).
@@ -145,10 +145,10 @@ safe_put_param(Name, {string, Value}) ->
 	do_safe_put_param(Name, Value);
 
 safe_put_param(Name, {Type, Value}) ->
-	?LOG:log(config, error, "Invalid type: {Name, Type, Value}", [Name, Type, Value]);
+	?LOG:log(error, "Invalid type: {Name, Type, Value}", [Name, Type, Value]);
 
 safe_put_param(Name, _) ->
-	?LOG:log(config, error, "Invalid parameter: ~p", [Name]).
+	?LOG:log(error, "Invalid parameter: ", [Name]).
 
 
 
@@ -244,13 +244,16 @@ validate_config(KeyList) when is_list(KeyList) ->
 	validate_config(Key),
 	validate_config(Rest);
 
-validate_config(Key) ->
+validate_config({param, Key, {_Type, _Value}}) ->
 	%% unlikely to get an 'undefined' since
 	%% we should be parsing a valid Key !
 	Value=get_param(Key, undefined),
 	
 	Result=?DEFAULTS:validate_param_limit(Key, Value),
-	validate_config(Key, Result).
+	validate_config(Key, Result);
+
+validate_config(Key) ->
+	?LOG:log(error, "Invalid key: ", [Key]).
 
 
 %% @doc Verifies validity of {Key, Value}
@@ -260,7 +263,7 @@ validate_config(Key) ->
 validate_config(___, ok)                     -> ok;
 validate_config(___, no_validation_possible) -> ok;
 validate_config(Key, undefined) -> 
-	?LOG:log(config, warning, "Default not defined for key: ", [Key]),
+	?LOG:log(warning, "Default not defined for key: ", [Key]),
 	ok;
 
 validate_config(_Key, invalid_defaults) ->
@@ -273,13 +276,13 @@ validate_config(Key, _) ->
 	validate_store_min(Key, Default).
 
 validate_store_min(Key, undefined) ->
-	?LOG:log(config, warning, "Undefined 'min' value for key: ", [Key]);
+	?LOG:log(warning, "Undefined 'min' value for key: ", [Key]);
 
 validate_store_min(Key, {_Type, Default}) ->
 	put_param(Key, Default);
 
 validate_store_min(Key, _) ->
-	?LOG:log(config, error, "Default 'min' value in error for key: ",[Key]).
+	?LOG:log(error, "Default 'min' value in error for key: ",[Key]).
 
 
 
@@ -380,7 +383,11 @@ put_stat(_, _) ->
 %% ----------------------      ------------------------------
 test() ->
 	erase(),
+	?LOG:init(),
 	Data= [
+		   {param, user, {string, "jldupont"}}
+		   ,{param, pass, {string, "some_password"}}
+		   ,{param, threshold1, 10}
 		   ],
 	load_config(Data).
 

@@ -57,6 +57,7 @@ init(LogFileName) ->
 	],
 	Ret2=?LOG:open(Params),
 	process_open(Ret2),
+	%%io:format("Log:init: completed~n"),
 	Ret2.
 
 %% @doc Records log open errors
@@ -65,6 +66,7 @@ process_open({error, _Reason}) ->
 	?MNG:inc_stat(?STAT_OPEN_ERROR);
 
 process_open({ok, Log}) ->
+	%%io:format("process_open: log: ~p~n", [Log]),
 	put(log, Log);
 
 process_open({repaired, Log, _}) ->
@@ -93,6 +95,7 @@ log(Severity, Msg, Params) ->
 
 
 dolog(_Severity, undefined, _, _Params) ->
+	io:format("Logger undefined!~n"),
 	?MNG:inc_stat(?STAT_LOG_ERROR);
 
 dolog(Severity, Logger, Msg, []) ->
@@ -113,7 +116,8 @@ dolog(Severity, Logger, Msg, Params) ->
 record_result(ok) ->
 	ok;
 
-record_result(_) ->
+record_result(Result) ->
+	io:format("Log error: ~p~n",[Result]),
 	?MNG:inc_stat(?STAT_LOG_ERROR).
 
 
