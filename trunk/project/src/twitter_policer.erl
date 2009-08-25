@@ -12,8 +12,9 @@
 %% Exported Functions
 %%
 -export([
-		 init/1,
+		 init/0,
 		 start/0,
+		 get_policers/0,
 		 create_token_policer/2,
 		 police/4,
 		 
@@ -48,8 +49,33 @@ start_if_not(_)         -> ok.
 %%
 %% @spec init() -> void()
 %%
-init(Policers) ->
-	ok.
+init() ->
+	Policers=?DEFAULTS:policers(),
+	init(Policers).
+
+init([]) ->
+	ok;
+
+init(Policers) when is_list(Policers) ->
+	[Policer|Rest]=Policers,
+	init(Policer),
+	init(Rest);
+
+init(Policer) ->
+	Config=get_policer_config(Policer),
+	%%io:format("init: policer: ~p config:~p ~n",[Policer, Config]),	
+	create_token_policer(Policer, Config).
+
+
+
+%% @doc Retrieves the active policers
+%%
+%% @spec get_policers() -> list()
+%%
+get_policers() ->
+	call(get_policers).
+
+
 
 
 
@@ -89,7 +115,11 @@ police(Policer, ReplyTo, PassMsg, DropMsg) ->
 
 loop() ->
 	receive
+		{command, From, Command} ->
+			handle_command(From, Command);
+		
 		{create, Policer, Buckets} ->
+			%%io:format("create: policer[~p] Buckets[~p]~n",[Policer, Buckets]),
 			add_buckets(Policer, Buckets);
 		
 		{police, Policer, ReplyTo, PassMsg, DropMsg} ->
@@ -242,6 +272,34 @@ get_bucket(BucketId) ->
 	TokenValue=?MNG:get_param(TokenAtom, TokenMin),
 	InterValue=?MNG:get_param(InterAtom, InterMin),
 	{TokenValue, InterValue}.
+
+
+%% ----------------------          ------------------------------
+%%%%%%%%%%%%%%%%%%%%%%%%% HELPERS  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% ----------------------          ------------------------------
+
+call(Command) ->
+	?MODULE ! {command, self(), Command},
+	receive
+		{reply, Response} -> Response;
+		_                 -> {error, unexpected_reply}
+	after 1000 ->
+		{error, timeout}
+	end.
+
+
+%% ----------------------                  ------------------------------
+%%%%%%%%%%%%%%%%%%%%%%%%% COMMAND handlers %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% ----------------------                  ------------------------------
+
+handle_command(From, get_policers) ->
+	Policers=get({param, policers}),
+	reply(From, Policers).
+
+reply(From, Msg) ->
+	From ! {reply, Msg}.
+
+
 
 
 
