@@ -81,8 +81,7 @@ extract_config() ->
 	extract_config(Config).
 
 
-%% Extracts the configuration parameters
-%% from the Config terms.
+%% Extracts the configuration parameters from the Config terms.
 %%
 %% The 'terms' should have already been 'sanitized'.
 %% @spec extract_config(Config) -> {ok, Config} | {error, Reason}
@@ -91,16 +90,6 @@ extract_config() ->
 %%
 %% @private
 extract_config(Config) ->
-	try
-		{{param, user}, {string, User}}=?TOOLS:kfind({param, user}, Config),
-		{{param, pass}, {string, Pass}}=?TOOLS:kfind({param, pass}, Config),
-		put(user, User),
-		put(pass, Pass)
-	catch
-		_X:_Y ->
-			?LOG:log(error, "Username and/or Password parameters not found/invalid."),
-			{error, {extracting_username, extracting_password}}
-	end,
 	try
 		%% insert config parameters in the process dictionary
 		extract_params(Config),
@@ -123,39 +112,50 @@ extract_params([]) ->
 %%
 extract_params(Config) when is_list(Config)->
 	[Param|Rest] = Config,
+	io:format("extract_params: param: ~p~n",[Param]),
 	try
-		{param, ParamName, Value} = Param,
-		safe_put_param(ParamName, Value)
+		{{param, ParamName}, {Type, Value}} = Param,
+		io:format("extract_params: param: ~p type: ~p ~n",[ParamName, Type]),
+		safe_put_param(ParamName, Type, Value)
 	catch
-		_:_ ->
-			?LOG:log(error, "Invalid parameter: ", [Param]),
+		X:Y ->
+			io:format("X[~p] Y[~p]~n",[X,Y]),
+			?LOG:log(error, "Extraction: Invalid parameter: ", [Param]),
 			{error, {invalid_param, Param}}
 	end,
 	extract_params(Rest).
 
 
 
-safe_put_param(Name, {atom, Value}) ->
+safe_put_param(Name, atom, Value) ->
 	do_safe_put_param(Name, Value);
 
-safe_put_param(Name, {int, Value}) ->
+safe_put_param(Name, int, Value) ->
 	do_safe_put_param(Name, Value);
 
-safe_put_param(Name, {string, Value}) ->
+safe_put_param(Name, string, Value) ->
 	do_safe_put_param(Name, Value);
 
-safe_put_param(Name, {Type, Value}) ->
-	?LOG:log(error, "Invalid type: {Name, Type, Value}", [Name, Type, Value]);
+safe_put_param(Name, nstring, Value) ->
+	do_safe_put_param(Name, Value);
 
-safe_put_param(Name, _) ->
-	?LOG:log(error, "Invalid parameter: ", [Name]).
+safe_put_param(Name, Type, Value) ->
+	?LOG:log(error, "Invalid type: {Name, Type, Value}", [Name, Type, Value]).
 
 
 
 do_safe_put_param(Name, Value) ->
-	Blacklisted=lists:member(Name, ?DEFAULTS:getblacklist()),
+	Blacklisted=lists:member(Name, ?DEFAULTS:blacklist()),
 	put_param(Blacklisted, Name, Value).
 	
+
+put_param(true, Name, _Value) ->
+	?LOG:log(warning, "Attempt to set a blacklisted key: ",[Name]),
+	{error, {parameter_blacklisted, Name}};
+
+put_param(false, Name, Value) ->
+	put({param, Name}, Value).
+
 
 %% @doc Put a parameter in the process dictionary.
 %%		Value is *not* typed.
@@ -166,12 +166,6 @@ do_safe_put_param(Name, Value) ->
 %%		Value = atom() | string() | integer()
 put_param(Name, Value) ->
 	put_param(false, Name, Value).
-
-put_param(true, Name, _Value) ->
-	{error, {parameter_blacklisted, Name}};
-
-put_param(false, Name, Value) ->
-	put({param, Name}, Value).
 
 
 
@@ -235,43 +229,87 @@ validate_config([]) ->
 	ok;
 
 %% @doc Go through all the configuration parameters & validate
+%%		The configuration parameters are validated 1 by 1
+%%		by looking up the DEFAULTS for type information.
 %%
-%% @spec validate_config(KeyList) -> void()
-%% KeyList = list()
+%% @spec validate_config(Config) -> void()
+%% Config = [tuple()]
 %%
-validate_config(KeyList) when is_list(KeyList) ->
-	[Key|Rest] = KeyList,
-	validate_config(Key),
+validate_config(Config) when is_list(Config) ->
+	[Entry|Rest] = Config,
+	validate_config(Entry),
 	validate_config(Rest);
 
-validate_config({param, Key, {_Type, _Value}}) ->
-	%% unlikely to get an 'undefined' since
-	%% we should be parsing a valid Key !
-	Value=get_param(Key, undefined),
-	
-	Result=?DEFAULTS:validate_param_limit(Key, Value),
-	validate_config(Key, Result);
+validate_config(Entry) ->
+	try
+		{{param, Key}, {_Type, _Value}} = Entry, 
+		CurrentValue    = get_param(Key, undefined),
+		{_, ValidTypedValue}= ?DEFAULTS:get_default(Key),
+		validate_key(Key, CurrentValue, ValidTypedValue)
+	catch
+		_:_ ->
+			io:format("validate_config: skipping entry[~p]~n", [Entry])
+	end.
 
-validate_config(Key) ->
+
+validate_key(_Key, _CurrentValue, {atom, _}) ->
+	ok;
+
+validate_key(Key, CurrentValue, {int, _}) ->
+	case erlang:is_integer(CurrentValue) of
+		true  ->
+			Result=?DEFAULTS:validate_param_limit(Key, CurrentValue),
+			validate_int(Key, Result);
+		
+		false ->
+			?LOG:log(error, "Expecting 'int' type for key: ", [Key])
+	end;
+
+
+validate_key(Key, CurrentValue, {string, _}) ->
+	case erlang:is_list(CurrentValue) of
+		true  -> ok;
+		false -> ?LOG:log(error, "Expecting 'string' type for key: ", [Key])
+	end;
+
+validate_key(Key, CurrentValue, {nstring, _}) ->
+	case erlang:is_list(CurrentValue) of
+		true  ->
+			Size =?TOOLS:vsize(CurrentValue),
+			case Size of
+				undefined -> ?LOG:log(error, "Expecting string for key:",[Key]);
+				0         -> ?LOG:log(error, "Expecting non-empty string for key:",[Key]);
+				_         -> ok
+			end;
+			
+		false ->
+			?LOG:log(error, "Expecting 'string' type for key: ", [Key])
+	end;
+
+
+validate_key(Key, CurrentValue, TypedDefaultValue) ->
+	io:format("validate_key: Key[~p] Value[~p] TypedDefault[~p]~n",[Key, CurrentValue, TypedDefaultValue]),
 	?LOG:log(error, "Invalid key: ", [Key]).
+
+
 
 
 %% @doc Verifies validity of {Key, Value}
 %% 		and attempts to put 'min' value iff
 %%		validation error occurs.
 %%
-validate_config(___, ok)                     -> ok;
-validate_config(___, no_validation_possible) -> ok;
-validate_config(Key, undefined) -> 
+validate_int(___, ok)                     -> ok;
+validate_int(___, no_validation_possible) -> ok;
+validate_int(Key, undefined) -> 
 	?LOG:log(warning, "Default not defined for key: ", [Key]),
 	ok;
 
-validate_config(_Key, invalid_defaults) ->
+validate_int(_Key, invalid_defaults) ->
 	%% nothing we can really do here...
 	%% the error was already logged upstream
 	ok;
 
-validate_config(Key, _) ->
+validate_int(Key, _) ->
 	Default=?DEFAULTS:get_min(Key),
 	validate_store_min(Key, Default).
 
@@ -385,9 +423,9 @@ test() ->
 	erase(),
 	?LOG:init(),
 	Data= [
-		   {param, user, {string, "jldupont"}}
-		   ,{param, pass, {string, "some_password"}}
-		   ,{param, threshold1, 10}
+		    {{param, user},       {nstring, "jldupont"}}
+		   ,{{param, pass},       {nstring, "some_password"}}
+		   ,{{param, threshold1}, 10}
 		   ],
 	load_config(Data).
 
