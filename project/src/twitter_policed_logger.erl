@@ -13,10 +13,24 @@
 %%
 %% API Functions
 %%
+
+%% @doc Initialization
+%%
+%% @spec init() -> void()
+%%
 init() ->
-	ok.
+	?POLICER:init().
 
 
+%% @doc Log a Message with Severity and
+%%      policed through Context.
+%%
+%% @spec log(Context, Severity, Msg) -> void()
+%% where
+%%	Context = atom()
+%%	Severity = atom()
+%%	Msg = string() | atom() | integer() | list()
+%%
 log(Context, Severity, Msg) ->
 	ok.
 
