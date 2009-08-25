@@ -23,6 +23,7 @@
 %% Macros
 %%
 -define(CONFIG_FILENAME, ".twitter").
+-define(CTOOLS,          twitter_config_tools).
 -define(TOOLS,           twitter_tools).
 -define(DEFAULTS,        twitter_defaults).
 -define(LOG,             twitter_log).
@@ -40,7 +41,7 @@ load_config() ->
 %% Mainly used for debugging
 %% @private
 load_config(Config) ->
-	?DEFAULTS:put_defaults(),
+	?CTOOLS:put_defaults(),
 	Result=extract_config(Config),
 	validate_config(Config),
 	put(config_state, Result),
@@ -64,7 +65,7 @@ load_config_file() ->
 			{error, Reason};
 		
 		{ok, Config} ->
-			?DEFAULTS:put_defaults(),
+			?CTOOLS:put_defaults(),
 			Result=extract_config(Config),
 			validate_config(Config),
 			put(config_state, Result),
@@ -244,7 +245,7 @@ validate_config(Entry) ->
 	try
 		{{param, Key}, {_Type, _Value}} = Entry, 
 		CurrentValue    = get_param(Key, undefined),
-		{_, ValidTypedValue}= ?DEFAULTS:get_default(Key),
+		{_, ValidTypedValue}= ?CTOOLS:get_default(Key),
 		validate_key(Key, CurrentValue, ValidTypedValue)
 	catch
 		_:_ ->
@@ -259,7 +260,7 @@ validate_key(Key, CurrentValue, {int, _}) ->
 	%%io:format("validate_key: key[~p] CurrentValue[~p]~n",[Key, CurrentValue]),
 	case erlang:is_integer(CurrentValue) of
 		true  ->
-			Result=?DEFAULTS:validate_param_limit(Key, CurrentValue),
+			Result=?CTOOLS:validate_param_limit(Key, CurrentValue),
 			validate_int(Key, Result);
 		
 		false ->
@@ -311,7 +312,7 @@ validate_int(_Key, invalid_defaults) ->
 	ok;
 
 validate_int(Key, _) ->
-	Default=?DEFAULTS:get_min(Key),
+	Default=?CTOOLS:get_min(Key),
 	validate_store_min(Key, Default).
 
 validate_store_min(Key, undefined) ->
@@ -426,8 +427,8 @@ test() ->
 	Data= [
 		    {{param, user},       {nstring, "jldupont"}}
 		   ,{{param, pass},       {nstring, "some_password"}}
-		   ,{{param, threshold1}, 10}
 		   ,{{param, threshold1}, {int, 10}}
+		   ,{{param, threshold2}, 10}		  
 		   ],
 	load_config(Data).
 

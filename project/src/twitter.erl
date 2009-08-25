@@ -21,6 +21,7 @@
 -define(DEFAULTS, twitter_defaults).
 -define(POLICER,  twitter_policer).
 -define(SERVER,   twitter).
+-define(LOGGER,   twitter_log).
 -define(LOG,      twitter_policed_logger).
 -define(TOOLS,    twitter_tools).
 -define(REQ,      twitter_req).
@@ -65,7 +66,7 @@ start() ->
 	inets:start(),
 	Pid = spawn(?MODULE, loop, []),
 	register(?SERVER, Pid),
-	?SERVER ! start,
+	?SERVER ! reload,
 	{ok,Pid}.
 
 %% Start Link
@@ -75,7 +76,7 @@ start_link() ->
 	inets:start(),
 	Pid = spawn_link(?MODULE, loop, []),
 	register(?SERVER, Pid),
-	?SERVER ! start,
+	?SERVER ! reload,
 	{ok,Pid}.
 
 %% Stop
@@ -94,10 +95,10 @@ stop() ->
 %% @private
 loop() ->
 	receive
-		start ->
+		reload ->
+			?LOGGER:init(),
 			?MNG:load_config(),
-			
-			?POLICER:init(?DEFAULTS:get_policers()),
+			?POLICER:init(),
 			?LOG:init(),
 			
 			config_timer(),
