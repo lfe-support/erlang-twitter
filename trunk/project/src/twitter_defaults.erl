@@ -56,15 +56,15 @@ defaults() ->
 	,{'policer.mswitch_error.bucket1', bucket1}
 	,{'policer.mswitch_error.bucket2', bucket2}
 	
-	,{'bucket.bucket1.tokens',         1}
+	,{'bucket.bucket1.tokens',       1}
 	,{'bucket.bucket1.tokens.min',   1}
 	,{'bucket.bucket1.tokens.max',   2}
-	,{'bucket.bucket1.interval',		 60*1000}
+	,{'bucket.bucket1.interval',	 60*1000}
 
-	,{'bucket.bucket2.tokens',         2}
+	,{'bucket.bucket2.tokens',       2}
 	,{'bucket.bucket2.tokens.min',   1}
 	,{'bucket.bucket2.tokens.max',   6}
-	,{'bucket.bucket2.interval',		 24*60*1000}
+	,{'bucket.bucket2.interval',	 24*60*1000}
 	
 ].
 
@@ -92,7 +92,7 @@ descriptions() ->
 
 policers() ->
 [
- 	policer.mswitch_error
+ 	mswitch_error
 ].
 
 policer_bucket_names() ->
@@ -211,7 +211,7 @@ cmp(_, _, _) ->
 
 %% @doc Retrieves the 'min' value for Key in the Defaults
 %%
-%% @spec get_min(Key, Default) -> Value
+%% @spec get_min(Key, Default) -> {Key, Value}
 %% where
 %%	Key=atom()
 %%	Default=atom() | integer()
@@ -223,7 +223,7 @@ get_min(Key, Default) ->
 
 %% @doc Retrieves the 'max' value for Key in the Defaults
 %%
-%% @spec get_max(Key, Default) -> Value
+%% @spec get_max(Key, Default) -> {Key, Value}
 %% where
 %%	Key=atom()
 %%	Default=atom() | integer()
@@ -231,6 +231,7 @@ get_min(Key, Default) ->
 %%
 get_max(Key, Default) ->
 	get_special(".max", Key, Default).
+
 
 
 get_special(Pattern, Key, Default) when is_atom(Pattern) ->
@@ -243,8 +244,8 @@ get_special(Pattern, Key, Default) when is_list(Pattern) ->
 	Result=?TOOLS:kfind(Vara, defaults()),
 	%%io:format("get_special: var:<~p> result: ~p~n",[Vara, Result]),	
 	case Result of
-		{Vara, Value} -> Value;
-		_             -> Default
+		{Vara, Value} -> {Key, Value};
+		_             -> {Key, Default}
 	end.
 	
 
