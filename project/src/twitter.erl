@@ -21,7 +21,7 @@
 -define(DEFAULTS, twitter_defaults).
 -define(POLICER,  twitter_policer).
 -define(SERVER,   twitter).
--define(LOG,      twitter_log).
+-define(LOG,      twitter_policed_logger).
 -define(TOOLS,    twitter_tools).
 -define(REQ,      twitter_req).
 -define(TAPI,     twitter_api).
@@ -183,6 +183,7 @@ daemon_api(ReplyContext, Command) ->
 		true ->
 			?RPC:rpc(ReplyContext, Command);
 		_ ->
+			?MNG:inc_stat(error_daemon_api_invalid_command),
 			{error, invalid_command}
 	end.
 
@@ -201,11 +202,13 @@ do_sync() ->
 		error:undef ->
 			?MNG:inc_stat(mswitch_not_found),
 			put(mswitch, not_found),
+			?LOG:log(mswitch_error, error, "mswitch not found"),
 			error;
 
 		_:_ ->
 			?MNG:inc_stat(mswitch_node_not_found),
 			put(mswitch, not_found),
+			?LOG:log(mswitch_error, error, "mswitch node not found"),
 			error
 	end.
 
@@ -247,3 +250,4 @@ do_heart_publish() ->
 inbox({FromNode, Server, Message}) ->
 	%%io:format("inbox: FromNode[~p] Server[~p] Message[~p]~n",[FromNode, Server, Message]),
 	Server ! {mswitch, FromNode, Message}.
+
