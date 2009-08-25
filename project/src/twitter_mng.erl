@@ -9,6 +9,9 @@
 %%   <li>pass</li>
 %%  </ul>
 %%
+%% Parameters retrieved from DEFAULTS are *typed* whereas
+%% the ones retrieved from the process dictionary aren't.
+%%
 -module(twitter_mng).
 -compile(export_all).
 
@@ -20,8 +23,9 @@
 %% Macros
 %%
 -define(CONFIG_FILENAME, ".twitter").
--define(TOOLS, twitter_tools).
--define(DEFAULTS, twitter_defaults).
+-define(TOOLS,           twitter_tools).
+-define(DEFAULTS,        twitter_defaults).
+-define(LOG,             twitter_policed_logger).
 
 
 
@@ -29,7 +33,20 @@
 %%%%%%%%%%%%%%%%%%%%%%%%% CONFIG %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% ----------------------        ------------------------------
 
-	   
+load_config() ->
+	load_config_file().
+
+
+%% Mainly used for debugging
+%% @private
+load_config(Config) ->
+	?DEFAULTS:put_defaults(),
+	Result=extract_config(Config),
+	validate_config(Config),
+	put(config_state, Result),
+	Result.
+	
+
 
 %% @doc Loads the config file and updates the local variables & config state. 
 %%
@@ -39,10 +56,10 @@
 %% @spec load_config() -> {error, Reason} | {ok, Config}
 %%
 %% @private
-load_config() ->
+load_config_file() ->
 	case read_config() of
 		{error, Reason} ->
-			error_logger:error_msg("twitter: error with configuration file [~p]~n", [Reason]),
+			?LOG:log(config, error, "File error reading configuration file, reason: ", [Reason]),
 			put(config_state, {error, Reason}),
 			{error, Reason};
 		
@@ -53,6 +70,8 @@ load_config() ->
 			put(config_state, Result),
 			Result
 	end.
+
+%do_load_config
 
 %% @doc Debug only (probably)
 %%
@@ -73,19 +92,22 @@ extract_config() ->
 %% @private
 extract_config(Config) ->
 	try
-		{user, User}=?TOOLS:kfind(user, Config),
-		{pass, Pass}=?TOOLS:kfind(pass, Config),
+		{{param, user}, {string, User}}=?TOOLS:kfind({param, user}, Config),
+		{{param, pass}, {string, Pass}}=?TOOLS:kfind({param, pass}, Config),
 		put(user, User),
-		put(pass, Pass),
-		
+		put(pass, Pass)
+	catch
+		_X:_Y ->
+			?LOG:log(config, error, "Username and/or Password parameters not found/invalid."),
+			{error, {extracting_username, extracting_password}}
+	end,
+	try
 		%% insert config parameters in the process dictionary
 		extract_params(Config),
 		ok
 	catch
-		X:Y ->
-			%% @TODO use the defined logger!
-			error_logger:error_msg("twitter: extract_config [~p:~p]~n", [X,Y]),
-			{error, {extracting_username, extracting_password}}
+		_:_ ->
+			?LOG:log(config, error, "Parameters extraction from configuration file.")
 	end.
 
 
@@ -105,20 +127,43 @@ extract_params(Config) when is_list(Config)->
 		{param, ParamName, Value} = Param,
 		safe_put_param(ParamName, Value)
 	catch
-		%% @TODO log errors!
 		_:_ ->
+			?LOG:log(config, error, "Invalid parameter: ~p", [Param]),
 			{error, {invalid_param, Param}}
 	end,
 	extract_params(Rest).
 
 
-safe_put_param(Name, Value) ->
+
+safe_put_param(Name, {atom, Value}) ->
+	do_safe_put_param(Name, Value);
+
+safe_put_param(Name, {int, Value}) ->
+	do_safe_put_param(Name, Value);
+
+safe_put_param(Name, {string, Value}) ->
+	do_safe_put_param(Name, Value);
+
+safe_put_param(Name, {Type, Value}) ->
+	?LOG:log(config, error, "Invalid type: {Name, Type, Value}", [Name, Type, Value]);
+
+safe_put_param(Name, _) ->
+	?LOG:log(config, error, "Invalid parameter: ~p", [Name]).
+
+
+
+do_safe_put_param(Name, Value) ->
 	Blacklisted=lists:member(Name, ?DEFAULTS:getblacklist()),
 	put_param(Blacklisted, Name, Value).
 	
 
-
-
+%% @doc Put a parameter in the process dictionary.
+%%		Value is *not* typed.
+%%
+%% @spec put_param(Name, Value) -> void()
+%%	where
+%%		Name  = atom()
+%%		Value = atom() | string() | integer()
 put_param(Name, Value) ->
 	put_param(false, Name, Value).
 
@@ -131,7 +176,7 @@ put_param(false, Name, Value) ->
 
 
 get_param(Name, Default) ->
-	?TOOLS:getvar({param,Name}, Default).
+	?TOOLS:getvar({param, Name}, Default).
 
 
 
@@ -174,14 +219,15 @@ process_config([]) ->
 	{error, invalid_config_file};
 
 process_config(Terms) ->
-	Ufound=lists:keymember(user, 1, Terms),
-	Pfound=lists:keymember(pass, 1, Terms),
+	Ufound=lists:keymember({param, user}, 1, Terms),
+	Pfound=lists:keymember({param, pass}, 1, Terms),
 	process_config(Terms, Ufound, Pfound).
 
 process_config(_Terms, false, false) ->	{error, {missing_username, missing_password}};
 process_config(_Terms, true,  false) ->	{error, missing_password};
 process_config(_Terms, false, true)  ->	{error, missing_username};
 process_config(Terms,  true,  true)  ->	{ok, Terms}.
+
 
 
 
@@ -199,7 +245,6 @@ validate_config(KeyList) when is_list(KeyList) ->
 	validate_config(Rest);
 
 validate_config(Key) ->
-	
 	%% unlikely to get an 'undefined' since
 	%% we should be parsing a valid Key !
 	Value=get_param(Key, undefined),
@@ -207,22 +252,34 @@ validate_config(Key) ->
 	Result=?DEFAULTS:validate_param_limit(Key, Value),
 	validate_config(Key, Result).
 
-validate_config(_Key, ok) ->
+
+%% @doc Verifies validity of {Key, Value}
+%% 		and attempts to put 'min' value iff
+%%		validation error occurs.
+%%
+validate_config(___, ok)                     -> ok;
+validate_config(___, no_validation_possible) -> ok;
+validate_config(Key, undefined) -> 
+	?LOG:log(config, warning, "Default not defined for key: ", [Key]),
 	ok;
 
-%% Traps 'invalid' atom amongst others of course...
-%%
+validate_config(_Key, invalid_defaults) ->
+	%% nothing we can really do here...
+	%% the error was already logged upstream
+	ok;
+
 validate_config(Key, _) ->
-	Default=?DEFAULTS:get_min(Key, undefined),
+	Default=?DEFAULTS:get_min(Key),
 	validate_store_min(Key, Default).
 
+validate_store_min(Key, undefined) ->
+	?LOG:log(config, warning, "Undefined 'min' value for key: ", [Key]);
 
-%% @TODO generate log error
-validate_store_min(_Key, undefined) ->
-	ok;
+validate_store_min(Key, {_Type, Default}) ->
+	put_param(Key, Default);
 
-validate_store_min(Key, Default) ->
-	put_param(Key, Default).
+validate_store_min(Key, _) ->
+	?LOG:log(config, error, "Default 'min' value in error for key: ",[Key]).
 
 
 
@@ -317,4 +374,13 @@ put_stat(_, _) ->
 	{error, invalid_name}.
 
 
+
+%% ----------------------      ------------------------------
+%%%%%%%%%%%%%%%%%%%%%%%%% TEST %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% ----------------------      ------------------------------
+test() ->
+	erase(),
+	Data= [
+		   ],
+	load_config(Data).
 
