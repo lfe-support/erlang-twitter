@@ -267,8 +267,7 @@ kfind(Key, [], Default) ->
 	{Key, Default};
 
 kfind(Key, List, Default) ->
-	Ret=kfind(Key, List),
-	case Ret of
+	case kfind(Key, List) of
 		false        -> {Key, Default};
 		{Key, Value} ->	{Key, Value}
 	end.
@@ -282,12 +281,12 @@ force_list(Key) ->
 	Key.
 
 
-		%% Result = {{HttpVersion, HttpCode, HttpResponseCode}, [Headers], ResponseBody}
-		%% HttpVersion = string()         (eg. "HTTP/1.1")
-		%% HttpCode = integer()           (eg. "200")
-		%% HttpResponseCode = string()    (eg. "OK")
-		%% Headers = {key, value}, {key, value} ...
-		%% ResponseBody = string()
+%% Result = {{HttpVersion, HttpCode, HttpResponseCode}, [Headers], ResponseBody}
+%% HttpVersion = string()         (eg. "HTTP/1.1")
+%% HttpCode = integer()           (eg. "200")
+%% HttpResponseCode = string()    (eg. "OK")
+%% Headers = {key, value}, {key, value} ...
+%% ResponseBody = string()
 
 
 extract(Result, headers) ->

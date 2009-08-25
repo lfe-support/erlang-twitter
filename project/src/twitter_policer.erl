@@ -4,8 +4,9 @@
 %%
 -module(twitter_policer).
 
--define(TOOLS, twitter_tools).
--define(MNG,   twitter_mng).
+-define(DEFAULTS, twitter_defaults).
+-define(TOOLS,    twitter_tools).
+-define(MNG,      twitter_mng).
 
 %%
 %% Exported Functions
@@ -14,7 +15,9 @@
 		 init/1,
 		 start/0,
 		 create_token_policer/2,
-		 police/4
+		 police/4,
+		 
+		 get_policer_config/1
 		 ]).
 
 %% Local functions
@@ -25,6 +28,8 @@
 
 %% TESTS
 -export([
+		 test/0,
+		 test2/0
 		 ]).
 
 
@@ -194,10 +199,57 @@ do_policing(PreviousResult, Policer, Buckets, ReplyTo, PassMsg, DropMsg) when is
 %%   Tokens   = {bucket.BucketId.tokens}
 %%   Interval = {bucket.BucketId.interval}
 %%
+%% @spec get_policer_config(PolicerName) -> [Bucket1, Bucket2]
+%%
 get_policer_config(PolicerName) ->
 	BucketName1=get_policer_bucket(PolicerName, 1),
 	BucketName2=get_policer_bucket(PolicerName, 2),
-	
+	Bucket1=get_bucket(BucketName1),	
+	Bucket2=get_bucket(BucketName2),
+	policer_config_result(Bucket1, Bucket2).
+
+policer_config_result({},{}) ->
+	undefined;
+
+policer_config_result(Bucket1,Bucket2) ->
+	[Bucket1, Bucket2].
+
 
 get_policer_bucket(PolicerName, BucketId) ->
-	Atom=?TOOLS:concat_atom(Po)
+	BaseName=[policer,'.',PolicerName,'.',bucket,BucketId],
+	AtomName=?TOOLS:make_atom_from_list(BaseName),
+	?MNG:get_param(AtomName, undefined).
+	
+
+
+get_bucket(undefined) -> {};
+
+%% @doc Retrieves the Bucket associated with the identifier BucketId
+%%
+%% @spec get_policer_bucket(PolicerName, BucketId) -> Bucket()
+%% where
+%%	@type Bucket = {MaxTokens, Interval}
+%%	MaxTokens= integer()
+%%	Interval = integer()
+get_bucket(BucketId) ->
+	BaseName=[bucket,'.',BucketId,'.'],
+	Token=BaseName++[tokens],
+	Inter=BaseName++[interval],
+	TokenAtom=?TOOLS:make_atom_from_list(Token),
+	InterAtom=?TOOLS:make_atom_from_list(Inter),
+	TokenMin=?DEFAULTS:get_min(TokenAtom, 1),
+	InterMin=?DEFAULTS:get_min(InterAtom, 1000),
+	TokenValue=?MNG:get_param(TokenAtom, TokenMin),
+	InterValue=?MNG:get_param(InterAtom, InterMin),
+	{TokenValue, InterValue}.
+
+
+
+test() ->
+	?DEFAULTS:put_defaults(),
+	get_policer_config(mswitch_error).
+
+test2() ->
+	?DEFAULTS:put_defaults(),
+	get_policer_config(unknown).
+	
