@@ -4,6 +4,7 @@
 %%
 -module(twitter_policer).
 
+-define(CTOOLS,   twitter_config_tools).
 -define(DEFAULTS, twitter_defaults).
 -define(TOOLS,    twitter_tools).
 -define(MNG,      twitter_mng).
@@ -128,7 +129,7 @@ loop() ->
 			handle_command(From, Command);
 		
 		{create, Policer, Buckets} ->
-			io:format("create: policer[~p] Buckets[~p]~n",[Policer, Buckets]),
+			%%io:format("create: policer[~p] Buckets[~p]~n",[Policer, Buckets]),
 			add_buckets(Policer, Buckets);
 		
 		{police, Policer, ReplyTo, PassMsg, DropMsg} ->
@@ -260,8 +261,11 @@ do_policing(PreviousResult, Policer, Buckets, ReplyTo, PassMsg, DropMsg) when is
 get_policer_config(PolicerName) ->
 	BucketName1=get_policer_bucket(PolicerName, 1),
 	BucketName2=get_policer_bucket(PolicerName, 2),
+	%%io:format("Bucket names: ~p  ~p ~n",[BucketName1, BucketName2]),
 	Bucket1=get_bucket(BucketName1),	
 	Bucket2=get_bucket(BucketName2),
+	%%io:format("Buckets: ~p  ~p ~n",[Bucket1, Bucket2]),
+	%%io:format("Dic: ~p~n",[get()]),
 	policer_config_result(Bucket1, Bucket2).
 
 policer_config_result({},{}) ->
@@ -274,6 +278,7 @@ policer_config_result(Bucket1,Bucket2) ->
 get_policer_bucket(PolicerName, BucketId) ->
 	BaseName=[policer,'.',PolicerName,'.',bucket,BucketId],
 	AtomName=?TOOLS:make_atom_from_list(BaseName),
+	%%io:format("Atom name: ~p ~n",[AtomName]),
 	?MNG:get_param(AtomName, undefined).
 	
 
@@ -293,8 +298,8 @@ get_bucket(BucketId) ->
 	Inter=BaseName++[interval],
 	TokenAtom=?TOOLS:make_atom_from_list(Token),
 	InterAtom=?TOOLS:make_atom_from_list(Inter),
-	TokenMin=?DEFAULTS:get_min(TokenAtom),
-	InterMin=?DEFAULTS:get_min(InterAtom),
+	TokenMin=?CTOOLS:get_min(TokenAtom),
+	InterMin=?CTOOLS:get_min(InterAtom),
 	TokenValue=?MNG:get_param(TokenAtom, TokenMin),
 	InterValue=?MNG:get_param(InterAtom, InterMin),
 	{TokenValue, InterValue}.
@@ -330,10 +335,10 @@ callreply(From, Msg) ->
 
 
 test() ->
-	?DEFAULTS:put_defaults(),
+	?CTOOLS:put_defaults(),
 	get_policer_config(mswitch_error).
 
 test2() ->
-	?DEFAULTS:put_defaults(),
+	?CTOOLS:put_defaults(),
 	get_policer_config(unknown).
 	
