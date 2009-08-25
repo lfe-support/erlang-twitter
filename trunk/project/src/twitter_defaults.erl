@@ -2,9 +2,13 @@
 %% Created: 2009-08-22
 %% Description: Default configuration parameters
 %%
+%% @TODO When changing defaults, a quick check should be made.
+%%
+%%
 -module(twitter_defaults).
 -compile(export_all).
 
+-define(LOG,   twitter_policed_logger).
 -define(TOOLS, twitter_tools).
 
 %% @doc Returns the parameters blacklist
@@ -43,28 +47,33 @@ blacklist() ->
 
 defaults() ->
 [
-	{refresh_limit_status, 5*60*1000}
-	,{threshold1,          25}
+	{refresh_limit_status,         {int, 5*60*1000}}
+	,{'refresh_limit_status.min',  {int, 5*60*1000}}
 
-	,{refresh_mswitch,     10*1000}
-	,{refresh_mswitch.min, 10*1000}
-	,{refresh_mswitch.max, 60*1000}
+	,{threshold1,          {int, 25}}
+	,{'threshold1.min',    {int, 25}}
+
+	,{refresh_mswitch,     {int, 10*1000}}
+	,{refresh_mswitch.min, {int, 10*1000}}
+	,{refresh_mswitch.max, {int, 60*1000}}
 
 	%%%%%%%%% POLICERS %%%%%%%%%%%%%%%%%%%%%%%%%
 
 	%% MSWITCH related
-	,{'policer.mswitch_error.bucket1', bucket1}
-	,{'policer.mswitch_error.bucket2', bucket2}
+	,{'policer.mswitch_error.bucket1', {atom, bucket1}}
+	,{'policer.mswitch_error.bucket2', {atom, bucket2}}
 	
-	,{'bucket.bucket1.tokens',       1}
-	,{'bucket.bucket1.tokens.min',   1}
-	,{'bucket.bucket1.tokens.max',   2}
-	,{'bucket.bucket1.interval',	 60*1000}
+	,{'bucket.bucket1.tokens',       {int, 1}}
+	,{'bucket.bucket1.tokens.min',   {int, 1}}
+	,{'bucket.bucket1.tokens.max',   {int, 2}}
+	,{'bucket.bucket1.interval',	 {int, 60*1000}}
+	,{'bucket.bucket1.interval.min', {int, 60*1000}}
 
-	,{'bucket.bucket2.tokens',       2}
-	,{'bucket.bucket2.tokens.min',   1}
-	,{'bucket.bucket2.tokens.max',   6}
-	,{'bucket.bucket2.interval',	 24*60*1000}
+	,{'bucket.bucket2.tokens',       {int, 2}}
+	,{'bucket.bucket2.tokens.min',   {int, 1}}
+	,{'bucket.bucket2.tokens.max',   {int, 6}}
+	,{'bucket.bucket2.interval',	 {int, 24*60*1000}}
+	,{'bucket.bucket2.interval.min', {int, 24*60*1000}}
 	
 ].
 
@@ -107,10 +116,11 @@ policer_bucket_names() ->
 
 %% @doc Retrieves the default Value for Var
 %%
-%% @spec get_default(Key) -> {Key, Value} | {}
+%% @spec get_default(Key) -> {Key, {Type, Value}} | {}
 %% where
-%%		Key=atom()
-%%      Value=atom() | list()
+%%		Key   = atom()
+%%      Value = atom() | list()
+%%		Type  = atom()
 %%
 get_default(Key) ->
 	Defaults=defaults(),
@@ -131,9 +141,10 @@ put_defaults([]) ->
 
 put_defaults(Defaults) ->
 	[Default|Rest]=Defaults,
-	{Key, Value}=Default,
+	{Key, {_Type, Value}}=Default,
 	put({param, Key}, Value),
 	put_defaults(Rest).
+
 
 
 
@@ -147,21 +158,36 @@ validate_param_limit(_Key, undefined) ->
 %%
 %% Only integer values are validated.
 %%
-%% @spec validate_param_limit(Key, Value) -> ok | too_low | too_high | invalid
+%% @spec validate_param_limit(Key, Value) -> ok | too_low | too_high | invalid_defaults | undefined | no_validation_possible
 %%
-validate_param_limit(Key, Value) when is_integer(Value) ->
-	%% builds a min & max atom for querying the table
-	Min=erlang:atom_to_list(Key)++".min",
-	Max=erlang:atom_to_list(Key)++".max",
-	Mina=erlang:list_to_atom(Min),
-	Maxa=erlang:list_to_atom(Max),
-	Pmin=?TOOLS:kfind(Mina, defaults()),
-	Pmax=?TOOLS:kfind(Maxa, defaults()),
-	validate_limit(Value, Pmin, Pmax);
+validate_param_limit(Key, Value) ->
+	TypedValue=get_default(Key),
+	validate_param_limit(Key, Value, TypedValue).
+	
 
-%% We only validate integers at the moment...
-validate_param_limit(_,_) ->
-	ok.
+validate_param_limit(_Key, _Value, {}) ->
+	undefined;
+
+validate_param_limit(Key, Value, {int, Value})  when is_integer(Value) ->
+	try
+		{int, Pmin}=get_min(Key),
+		{int, Pmax}=get_max(Key),
+		try
+			validate_limit(Value, Pmin, Pmax)
+		catch
+			_:_ ->
+				invalid_defaults
+		end
+	catch
+		_:_ ->
+			?LOG:log(config, error, "Invalid configuration: Key: ", [Key])
+	end;
+
+validate_param_limit(Key, _Value, {Type, _DefaultValue}) ->
+	io:format("validate_param_limit: invalid, Key:~p Type:~p~n",[Key, Type]),
+	no_validation_possible.
+													   
+
 
 
 %% No limits
@@ -211,43 +237,139 @@ cmp(_, _, _) ->
 
 %% @doc Retrieves the 'min' value for Key in the Defaults
 %%
-%% @spec get_min(Key, Default) -> {Key, Value}
+%% @spec get_min(Key) -> {Key, TypedValue}
 %% where
 %%	Key=atom()
-%%	Default=atom() | integer()
 %%	Value=atom() | list() | undefined
-%%
-get_min(Key, Default) ->
-	get_special(".min", Key, Default).
+%%	TypedValue= {Type, Value}
+%%  Type= atom()
+%%	Value=atom() | list() | undefined | invalid
+get_min(Key) ->
+	get_special(".min", Key).
 	
 
 %% @doc Retrieves the 'max' value for Key in the Defaults
 %%
-%% @spec get_max(Key, Default) -> {Key, Value}
+%% @spec get_max(Key) -> {Key, TypedValue}
 %% where
 %%	Key=atom()
-%%	Default=atom() | integer()
+%%	TypedValue= {Type, Value}
+%%  Type= atom()
 %%	Value=atom() | list() | undefined
 %%
-get_max(Key, Default) ->
-	get_special(".max", Key, Default).
+get_max(Key) ->
+	get_special(".max", Key).
 
 
 
-get_special(Pattern, Key, Default) when is_atom(Pattern) ->
+%% @doc Retrieves the TypedDefault for Key
+%%
+%%
+get_special(Pattern, Key) when is_atom(Pattern) ->
 	Pat=erlang:atom_to_list(Pattern),
-	get_special(Pat, Key, Default);
+	get_special(Pat, Key);
 
-get_special(Pattern, Key, Default) when is_list(Pattern) ->
+get_special(Pattern, Key) when is_list(Pattern) ->
 	Var=erlang:atom_to_list(Key)++Pattern,
 	Vara=erlang:list_to_atom(Var),
-	Result=?TOOLS:kfind(Vara, defaults()),
-	%%io:format("get_special: var:<~p> result: ~p~n",[Vara, Result]),	
-	case Result of
-		{Vara, Value} -> {Key, Value};
-		_             -> {Key, Default}
+	TypedDefault=?TOOLS:kfind(Vara, defaults()),
+	get_special(Pattern, Key, TypedDefault).
+
+
+get_special(_Pattern, _Key, {}) ->
+	undefined;
+	
+
+get_special(_Pattern, Key, TypedDefaultValue) ->
+	%%io:format("get_special: Key:<~p> typed: ~p~n",[Key, TypedDefaultValue]),	
+	{Key, TypedDefaultValue}.
+
+  
+has_pattern(Patterns, Key) when is_atom(Key) ->
+	has_pattern(Patterns, erlang:atom_to_list(Key));
+
+has_pattern(Patterns, Key) when is_list(Patterns) ->
+	do_has_pattern(false, Patterns, Key).
+
+do_has_pattern(true, _, _) ->
+	true;
+
+do_has_pattern(false, [], _Key) ->
+	false;
+	
+do_has_pattern(false, Patterns, Key) ->
+	[Pattern|Rest] = Patterns,
+	Result=check_pattern(Pattern, Key),
+	do_has_pattern(Result, Rest, Key).
+
+	
+
+check_pattern(Pattern, Key) ->
+	Str=erlang:atom_to_list(Pattern),
+	case string:str(Key, Str) of
+		0 -> false;
+		_ -> true
 	end.
-	
 
 
-	
+
+%% ----------------------            ------------------------------
+%%%%%%%%%%%%%%%%%%%%%%%%% VALIDATION %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% ----------------------            ------------------------------
+
+%% Verifies that each parameter
+%% - has a type
+%% - the type is valid
+%% - an 'int' comes with a 'min' default
+%% - has a 'description'
+check() ->
+	Defaults=defaults(),
+	check(Defaults).
+
+check([]) ->
+	finished_check;
+
+check(Defaults) ->
+	[Default|Rest] = Defaults,
+	check_default(Default),
+	check(Rest).
+
+check_default({}) ->
+	r("Found an empty entry");	
+
+check_default({_Key, {string, _Value}}) ->	ok;	
+check_default({_Key, {atom, _Value}}) ->	ok;
+check_default({Key,  {int, Value}}) when is_integer(Value)-> 
+	Presult = has_pattern(['.min', '.max'], Key),
+	case Presult of
+		true -> ok;
+		false->
+
+			Result=get_min(Key),
+			case Result of
+				undefined -> r("Expecting 'min' default for key[~p]", [Key]);
+				_         -> ok
+			end
+	end;
+
+check_default({Key,  {int, Value}}) -> 
+	r("Expecting 'int' type for Key[~p] got[~p]", [Key, Value]);
+
+
+check_default({_Key, {_Type, _Value}}) ->
+	ok.
+
+r(M) ->
+	io:format(M++"~n").
+
+r(M, P) ->
+	io:format(M++"~n", P).
+
+
+
+%% ----------------------      ------------------------------
+%%%%%%%%%%%%%%%%%%%%%%%%% TEST %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% ----------------------      ------------------------------
+
+test() ->
+	check().

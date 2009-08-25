@@ -41,6 +41,8 @@ init() ->
 log(Context, Severity, Msg) ->
 	?MODULE ! {log, Context, Severity, Msg}.
 
+log(Context, Severity, Msg, Params) ->
+	?MODULE ! {log, Context, Severity, Msg, Params}.
 
 
 
@@ -87,14 +89,20 @@ loop() ->
 		
 		{log, Ctx, Sev, Msg} ->
 			?POLICER:police(Ctx, self(), 
-							{pass, Sev, Msg}, 
-							{drop, Sev, Msg});
+							{pass, Sev, Msg, []}, 
+							{drop, Sev, Msg, []});
+
+		{log, Ctx, Sev, Msg, Params} ->
+			?POLICER:police(Ctx, self(), 
+							{pass, Sev, Msg, Params}, 
+							{drop, Sev, Msg, Params});
 		
-		{drop, _Sev, _Msg} ->
+		
+		{drop, _Sev, _Msg, _Params} ->
 			?MNG:inc_stat(log_policed_drop);
 		
-		{pass, Sev, Msg} ->
-			?LOGGER:log(Sev, Msg);
+		{pass, Sev, Msg, Params} ->
+			?LOGGER:log(Sev, Msg, Params);
 		
 		_ ->
 			?MNG:inc_stat(policed_log_invalid_msg_received)
