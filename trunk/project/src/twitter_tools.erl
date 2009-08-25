@@ -53,7 +53,7 @@
 		 head_pair/2, head_pair/3,
 		 
 		 make_atom_from_list/1,  make_atom_from_list/2
-		
+		 ,vsize/1
 		 ]).
 
 %%
@@ -425,3 +425,14 @@ make_atom_from_list([First, Second], [Third|Rest]) ->
 
 	
 	
+vsize(Atom) when is_atom(Atom) ->
+	erlang:length(erlang:atom_to_list(Atom));
+
+vsize(List) when is_list(List) ->
+	erlang:length(List);
+
+vsize(Tuple) when is_tuple(Tuple) ->
+	size(Tuple);
+
+vsize(_) ->
+	undefined.

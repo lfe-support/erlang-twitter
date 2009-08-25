@@ -22,12 +22,9 @@
 %% @spec blacklist() -> list()
 blacklist() ->
 [
-	user
-	,pass
-
 	%% Obviously, we do not want the user 
 	%% to change the permissible limits...
-	,refresh_mswitch_min
+	 refresh_mswitch_min
 	,refresh_mswitch_max
 
 	%% List of policers: provided just for debugging
@@ -47,6 +44,9 @@ blacklist() ->
 
 defaults() ->
 [
+ 	{user, {nstring, ""}},
+	{pass, {nstring, ""}},
+	
 	{refresh_limit_status,         {int, 5*60*1000}}
 	,{'refresh_limit_status.min',  {int, 5*60*1000}}
 
