@@ -241,10 +241,6 @@ do_heart_publish() ->
 	end.
 	
 
-do_log() ->
-	ok.
-
-
 
 %% @doc MSWITCH Mailbox
 %%
