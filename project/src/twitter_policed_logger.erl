@@ -39,10 +39,22 @@ init() ->
 %%	Msg = string() | atom() | integer() | list()
 %%
 log(Context, Severity, Msg) ->
-	?MODULE ! {log, Context, Severity, Msg}.
+	try
+		?MODULE ! {log, Context, Severity, Msg}
+	catch
+		_:_ -> 
+			io:format("~p: error, not init~n",[?MODULE])
+	end.
+			
 
 log(Context, Severity, Msg, Params) ->
-	?MODULE ! {log, Context, Severity, Msg, Params}.
+	try
+		?MODULE ! {log, Context, Severity, Msg, Params}
+	catch
+		_:_ ->
+			io:format("~p: error, not init~n",[?MODULE])
+	end.
+		
 
 
 

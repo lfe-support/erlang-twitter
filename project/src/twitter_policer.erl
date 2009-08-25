@@ -128,7 +128,7 @@ loop() ->
 			handle_command(From, Command);
 		
 		{create, Policer, Buckets} ->
-			%%io:format("create: policer[~p] Buckets[~p]~n",[Policer, Buckets]),
+			io:format("create: policer[~p] Buckets[~p]~n",[Policer, Buckets]),
 			add_buckets(Policer, Buckets);
 		
 		{police, Policer, ReplyTo, PassMsg, DropMsg} ->
@@ -293,8 +293,8 @@ get_bucket(BucketId) ->
 	Inter=BaseName++[interval],
 	TokenAtom=?TOOLS:make_atom_from_list(Token),
 	InterAtom=?TOOLS:make_atom_from_list(Inter),
-	TokenMin=?DEFAULTS:get_min(TokenAtom, 1),
-	InterMin=?DEFAULTS:get_min(InterAtom, 1000),
+	TokenMin=?DEFAULTS:get_min(TokenAtom),
+	InterMin=?DEFAULTS:get_min(InterAtom),
 	TokenValue=?MNG:get_param(TokenAtom, TokenMin),
 	InterValue=?MNG:get_param(InterAtom, InterMin),
 	{TokenValue, InterValue}.
