@@ -8,7 +8,7 @@
 -module(twitter_defaults).
 -compile(export_all).
 
--define(LOG,   twitter_policed_logger).
+-define(LOG,   twitter_log).
 -define(TOOLS, twitter_tools).
 
 %% @doc Returns the parameters blacklist
@@ -161,55 +161,101 @@ validate_param_limit(_Key, undefined) ->
 %% @spec validate_param_limit(Key, Value) -> ok | too_low | too_high | invalid_defaults | undefined | no_validation_possible
 %%
 validate_param_limit(Key, Value) ->
-	TypedValue=get_default(Key),
+	{_, TypedValue}=get_default(Key),
+	%%io:format("validate_param_limit: key[~p] Value[~p] Typedp[~p]~n", [Key, Value, TypedValue]),
 	validate_param_limit(Key, Value, TypedValue).
 	
 
 validate_param_limit(_Key, _Value, {}) ->
 	undefined;
 
-validate_param_limit(Key, Value, {int, Value})  when is_integer(Value) ->
+validate_param_limit(Key, Value, {int, _DefaultValue})  when is_integer(Value) ->
+	io:format("validate_param_limit: key[~p]~n",[Key]),
 	try
-		{int, Pmin}=get_min(Key),
-		{int, Pmax}=get_max(Key),
+		MinResult=get_min(Key),
+		MaxResult=get_max(Key),
+		io:format("validating with limits: Value[~p] Rmin[~p] Rmax[~p]~n",[Value, MinResult,MaxResult]),
 		try
-			validate_limit(Value, Pmin, Pmax)
+			try_validate_limit(Key, Value, MinResult, MaxResult)
 		catch
-			_:_ ->
-				invalid_defaults
+			X:Y ->
+				io:format("validate_param_limit: X[~p] Y[~p]~n",[X,Y]),
+				?LOG:log(error, "Error whilst validating key: ", [Key])
 		end
 	catch
 		_:_ ->
-			?LOG:log(config, error, "Invalid configuration: Key: ", [Key])
+			?LOG:log(error, "Invalid configuration: Key: ", [Key])
 	end;
+	
+
 
 validate_param_limit(Key, _Value, {Type, _DefaultValue}) ->
 	io:format("validate_param_limit: invalid, Key:~p Type:~p~n",[Key, Type]),
 	no_validation_possible.
-													   
 
 
 
-%% No limits
-validate_limit(_Value, {}, {}) ->
+
+try_validate_limit(Key, Value, {_, {int, Min}}, {_, {int, Max}} ) ->
+	Result=validate_limit(Value, Min, Max),
+	process_validate_result(Key, Result);
+
+try_validate_limit(Key, Value, {_, {int, Min}}, _) ->
+	Result=validate_limit(Value, Min, undefined),
+	process_validate_result(Key, Result);
+
+try_validate_limit(Key, Value, _, {_, {int, Max}}) ->
+	Result=validate_limit(Value, undefined, Max),
+	process_validate_result(Key, Result);
+
+try_validate_limit(Key, _Value, _MinResult, _MaxResult) ->
+	?LOG:log(error, "Invalid 'min' and/or 'max' defaults for key: ",[Key]).
+
+
+
+process_validate_result(_Key, ok) -> ok;
+process_validate_result(Key, invalid) ->
+	?LOG:log(error, "Value invalid for key: ",[Key]);
+
+process_validate_result(Key, too_low) ->
+	?LOG:log(error, "Value 'too low' for key: ", [Key]);
+
+process_validate_result(Key, too_high) ->
+	?LOG:log(error, "Value 'too high' for key: ", [Key]);
+
+process_validate_result(Key, _Other) ->
+	?LOG:log(critical, "Internal error whilst validating configuration key: ", [Key]).
+
+			
+	
+
+
+
+
+%% @doc Validates a limit
+%%
+%% @spec validate_limit(Value, Min, Max) -> invalid | too_low | too_high | ok
+%%
+validate_limit(_Value, undefined, undefined) ->
 	ok;
 
 %% Just lower limit
-validate_limit(Value, {_, Min}, {}) ->
+validate_limit(Value, Min, undefined) ->
 	cmp(min, Value, Min);
 
 %% Just upper limit
-validate_limit(Value, {}, {_, Max}) ->
+validate_limit(Value, undefined, Max) ->
 	cmp(max, Value, Max);
 
 %% Both limits
-validate_limit(Value, {_,Min}, {_,Max}) ->
+validate_limit(Value, Min, Max) when is_integer(Min), is_integer(Max) ->
 	R1=cmp(min, Value, Min),
 	R2=cmp(max, Value, Max),
 	resolve_cmp(R1, R2);
 
 %% CATCH-ALL
-validate_limit(_, _, _) ->
+validate_limit(V, Min, Max) ->
+	?LOG:log(critical, "Internal error in 'validate_limit': {V, Min, Max}", [V, Min, Max]),
 	ok.
 
 
@@ -237,7 +283,7 @@ cmp(_, _, _) ->
 
 %% @doc Retrieves the 'min' value for Key in the Defaults
 %%
-%% @spec get_min(Key) -> {Key, TypedValue}
+%% @spec get_min(Key) -> TypedValue
 %% where
 %%	Key=atom()
 %%	Value=atom() | list() | undefined
@@ -250,7 +296,7 @@ get_min(Key) ->
 
 %% @doc Retrieves the 'max' value for Key in the Defaults
 %%
-%% @spec get_max(Key) -> {Key, TypedValue}
+%% @spec get_max(Key) -> TypedValue
 %% where
 %%	Key=atom()
 %%	TypedValue= {Type, Value}
@@ -281,8 +327,8 @@ get_special(_Pattern, _Key, {}) ->
 	
 
 get_special(_Pattern, Key, TypedDefaultValue) ->
-	%%io:format("get_special: Key:<~p> typed: ~p~n",[Key, TypedDefaultValue]),	
-	{Key, TypedDefaultValue}.
+	io:format("get_special: Key:<~p> typed: ~p~n",[Key, TypedDefaultValue]),	
+	TypedDefaultValue.
 
   
 has_pattern(Patterns, Key) when is_atom(Key) ->

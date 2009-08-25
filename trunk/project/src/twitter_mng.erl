@@ -112,14 +112,14 @@ extract_params([]) ->
 %%
 extract_params(Config) when is_list(Config)->
 	[Param|Rest] = Config,
-	io:format("extract_params: param: ~p~n",[Param]),
+	%%io:format("extract_params: param: ~p~n",[Param]),
 	try
 		{{param, ParamName}, {Type, Value}} = Param,
-		io:format("extract_params: param: ~p type: ~p ~n",[ParamName, Type]),
+		%%io:format("extract_params: param: ~p type: ~p ~n",[ParamName, Type]),
 		safe_put_param(ParamName, Type, Value)
 	catch
-		X:Y ->
-			io:format("X[~p] Y[~p]~n",[X,Y]),
+		_X:_Y ->
+			%%io:format("X[~p] Y[~p]~n",[X,Y]),
 			?LOG:log(error, "Extraction: Invalid parameter: ", [Param]),
 			{error, {invalid_param, Param}}
 	end,
@@ -248,7 +248,7 @@ validate_config(Entry) ->
 		validate_key(Key, CurrentValue, ValidTypedValue)
 	catch
 		_:_ ->
-			io:format("validate_config: skipping entry[~p]~n", [Entry])
+			?LOG:log(info, "Skipping entry: ", [Entry])
 	end.
 
 
@@ -256,6 +256,7 @@ validate_key(_Key, _CurrentValue, {atom, _}) ->
 	ok;
 
 validate_key(Key, CurrentValue, {int, _}) ->
+	%%io:format("validate_key: key[~p] CurrentValue[~p]~n",[Key, CurrentValue]),
 	case erlang:is_integer(CurrentValue) of
 		true  ->
 			Result=?DEFAULTS:validate_param_limit(Key, CurrentValue),
@@ -426,6 +427,7 @@ test() ->
 		    {{param, user},       {nstring, "jldupont"}}
 		   ,{{param, pass},       {nstring, "some_password"}}
 		   ,{{param, threshold1}, 10}
+		   ,{{param, threshold1}, {int, 10}}
 		   ],
 	load_config(Data).
 
