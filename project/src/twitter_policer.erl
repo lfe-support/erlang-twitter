@@ -40,9 +40,18 @@ start() ->
 	{ok, Pid}.	
 
 %% @doc start the policer process iff not already started
-start_if_not()          -> start_if_not(erlang:whereis(?MODULE)).
-start_if_not(undefined) -> start();
-start_if_not(_)         -> ok.
+start_if_not() -> 
+	start_if_not(erlang:whereis(?MODULE)).
+
+start_if_not(undefined) -> 
+	start();
+
+start_if_not(Pid) -> 
+	case erlang:is_process_alive(Pid) of
+		false -> start();
+		true  -> already_started
+	end.
+
 
 
 %% @doc Initializes all required policers
@@ -144,6 +153,13 @@ add_buckets(Policer, Buckets) ->
 	?TOOLS:add_to_var_list({buckets, Policer}, Buckets).
   
 
+policing_reply(To, Msg) ->
+	try
+		To ! Msg
+	catch
+		_:_ ->
+			?MNG:inc_stat(error_policing_reply)
+	end.
 
 
 
@@ -152,7 +168,8 @@ add_buckets(Policer, Buckets) ->
 %%
 do_policing(pass, _Policer, [], ReplyTo, PassMsg, _) ->
 	case is_pid(ReplyTo) of
-		true ->	ReplyTo ! PassMsg;
+		%%true ->	ReplyTo ! PassMsg;
+		true -> policing_reply(ReplyTo, PassMsg);
 		_    -> pass
 	end;
 
@@ -160,7 +177,8 @@ do_policing(pass, _Policer, [], ReplyTo, PassMsg, _) ->
 %% Stop recursion on first 'drop' decision
 do_policing(drop, _Policer, _, ReplyTo, _, DropMsg) ->
 	case is_pid(ReplyTo) of
-		true -> ReplyTo ! DropMsg;
+		%%true -> ReplyTo ! DropMsg;
+		true -> policing_reply(ReplyTo, DropMsg);
 		_    -> drop
 	end;
 
@@ -216,6 +234,14 @@ do_policing(PreviousResult, Policer, Buckets, ReplyTo, PassMsg, DropMsg) when is
 	[Bucket|Rest] = Buckets,
 	Result = do_policing(PreviousResult, Policer, Bucket, ReplyTo, PassMsg, DropMsg),
 	do_policing(Result, Policer, Rest, ReplyTo, PassMsg, DropMsg).
+
+
+
+%% ----------------------            ------------------------------
+%%%%%%%%%%%%%%%%%%%%%%%%% MANAGEMENT %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% ----------------------            ------------------------------
+
+
 
 
 
@@ -294,9 +320,9 @@ call(Command) ->
 
 handle_command(From, get_policers) ->
 	Policers=get({param, policers}),
-	reply(From, Policers).
+	callreply(From, Policers).
 
-reply(From, Msg) ->
+callreply(From, Msg) ->
 	From ! {reply, Msg}.
 
 

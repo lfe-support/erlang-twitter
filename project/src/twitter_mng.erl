@@ -217,7 +217,7 @@ validate_config(Key, _) ->
 	validate_store_min(Key, Default).
 
 %% @TODO generate log error
-validate_store_min(Key, undefined) ->
+validate_store_min(_Key, undefined) ->
 	ok;
 
 validate_store_min(Key, Default) ->
@@ -272,8 +272,8 @@ get_dicclass(_,_) ->
 %%	Key = atom()
 %%	Value = atom() | list()
 %%
-get_validated(Class, Key) ->
-	ok.
+%%get_validated(Class, Key) ->
+%%	ok.
 
 
 
