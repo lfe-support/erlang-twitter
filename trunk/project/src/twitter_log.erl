@@ -2,21 +2,34 @@
 %% Created: 2009-08-25
 %% Description: Logging facility
 %%
-%% Configuration:
-%%	LogFileName
+%% @doc
 %%
-%% Potential Configuration:
-%%	MaxLogSize
-%%  MaxLogFiles
+%% == Configuration ==
+%%  <ul>
+%%	 <li>LogFileName: through 'start_link'</li>
+%%  </ul>
+%%
+%% == Potential Configuration ==
+%%  <ul>
+%%	 <li>MaxLogSize</li>
+%%   <li>MaxLogFiles</li>
+%%  </ul>
 %%	
 %% == MESSAGE API ==
 %% In order to simplify interfacing to this logger module,
 %% a message based API is provided. A client can send a 
 %% tuple to the registered named process 'logger':
+%%
 %% ```
 %%	{log, Severity, Msg, Params}
 %% '''
 %% 
+%% == TODO ==
+%%
+%%  <ul>
+%%	 <li>Auto-repair: if logging errors occur, automatically 'repair'</li>
+%%  </ul>
+
 -module(twitter_log).
 
 %% Keep this registered name in order for
