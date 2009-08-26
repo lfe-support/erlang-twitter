@@ -10,7 +10,61 @@
 %%    {log, Severity, Msg, Params}
 %%	'''
 %%
+%% == Reply Messages ==
+%% Reply messages are generated as a result of using API functions:
+%%
+%% === Subscribe ===
+%% ```
+%%  {switch, subscribed}
+%% '''
+%%
+%% === Publish ===
+%%
+%% When using the 'publish' API function, the following message is 
+%% sent back to the caller iff this module detects that an 'out-of-sync'
+%% condition prevails.
+%%
+%% ```
+%%	{switch, out_of_sync}
+%% '''
+%%
+%% === Common ===
+%% The following message is sent back to the caller on this condition
+%% of the switch not being available for receiving the request. 
+%% ```
+%% 	{switch, unreachable}
+%% '''
+%% This condition would typically occur when the switch hasn't been started
+%% or is in the process of being restarted.
+%%
+%% == Synchronization ==
+%%
+%% A 'client' module (one that uses the 'subscribe' API to receive messages)
+%% gets a 'synchronization state' inserted in its process dictionary as a 
+%% result of using this module: the variable in question is:
+%%
+%% ```
+%% 	{switch.pid}
+%% '''
+%%
+%% By referring to this caller-side variable, this module can detect when
+%% a client falls 'out-of-sync' and thus can inform the client caller of
+%% the condition.  The typical action on the client side would be to perform
+%% a 're-subscribe' action.
+%%
+%% === Important Note ===
+%%
+%% Note that the message '{switch, out_of_sync}' will also be sent when 
+%% the switch is first accessed as there is no realistic way of inferring a
+%% ''never been used'' condition.
+%%
+
 -module(twitter_switch).
+-compile({nowarn_unused_function, [timer_tick, loop_switch]}).
+
+%% Timer for dealing with Client/Switch restarts
+-define(DEFAULT_TIMER, 5*1000).
+
 
 %%=====%%
 %% API %%
@@ -21,10 +75,6 @@
 		 publish/3
 		 ]).
 
-%% LOCAL... keep compiler happy i.e. no warnings
--export([
-		 loop_switch/0
-		 ]).
 
 %% @doc Default start with 'logger'
 %%
@@ -53,6 +103,7 @@ start_link([{logger, LoggerName}]) ->
 %%	Type = atom()
 %%
 subscribe(From, Type) when is_atom(From), is_atom(Type) ->
+	check_sync(),
 	to_switch(From, subscribe, Type).
 
 
@@ -66,6 +117,7 @@ subscribe(From, Type) when is_atom(From), is_atom(Type) ->
 %%	Msg = list() | atom() | tuple()
 %%
 publish(From, Type, Msg) when is_atom(From), is_atom(Type) ->
+	check_sync(),
 	to_switch(From, publish, {Type, Msg}).
 
 
@@ -76,15 +128,40 @@ publish(From, Type, Msg) when is_atom(From), is_atom(Type) ->
 %% ----------------------           ------------------------------
 
 
-%% @doc Communication bridge with the switch process
-%%
-to_switch(From, Cmd, Msg) ->
-	try ?MODULE ! {From, Cmd, Msg} of
-		{From, Cmd, Msg} -> ok
-	catch
-		_:_ ->  log(critical, "switch: fail to switch {Cmd, Msg}: ",[Cmd,Msg])
+check_sync() ->
+	%% clear any outstanding timer
+	%% because we are going to set one anyway
+	OldTimer=get({switch.timer}),
+	erase({switch.timer}),
+	timer:cancel(OldTimer),
+	set_timer().
+
+set_timer() ->
+	SwitchPid=get_pid(switch),
+	Result=timer:apply_after(?DEFAULT_TIMER, ?MODULE, timer_tick, [self(), SwitchPid]),
+	case Result of
+		%% We can't do much here... 
+		{error, Reason} -> put({switch, last_error}, Reason);
+		{ok, TRef}      -> put(switch.timer, TRef);
+		_               -> not_much_we_can_do
 	end.
 
+
+%% @doc Timer expiry handler
+%%		Sends a message to the caller iff an 'out-of-sync' condition is detected.
+%%
+%% @spec timer_tick(CallerPid, PreviousSwitchPid) -> void()
+%% where
+%%	CallerPid = pid()         % the pid() of the Caller
+%%	PreviousSwitchPid = pid() % the pid() of the switch as it was before starting the timer
+%%
+timer_tick(CallerPid, PreviousSwitchPid) ->
+	CurrentSwitchPid=get_pid(switch),
+	compare_switch_pids(CallerPid, PreviousSwitchPid, CurrentSwitchPid).
+
+compare_switch_pids(CallerPid, X, X) ->	in_sync;
+compare_switch_pids(CallerPid, _, _) -> reply(CallerPid, {switch, out_of_sync}).
+	
 
 %% @doc Reply to Caller
 %%		Make this as robust as possible since
@@ -99,6 +176,42 @@ reply(To, Msg) ->
 	try    To ! Msg
 	catch _:_ -> log(critical, "switch: couldn't reply {To, Msg} ", [To, Msg])
 	end.
+
+
+
+%% @doc Communication bridge with the switch process
+%%
+to_switch(From, Cmd, Msg) ->
+	try ?MODULE ! {From, Cmd, Msg} of
+		{From, Cmd, Msg} -> ok
+	catch
+		_:_ ->
+			%% Safely sends a message back to the caller
+			reply(From, {switch, unreachable}),
+			log(critical, "switch: fail to switch {Cmd, Msg}: ",[Cmd,Msg])
+	end.
+
+
+
+loop_switch() ->
+	receive
+		{logger, LoggerName} ->
+			put(logger, LoggerName);
+		
+		%% SWITCH DUTY: subscribe
+		{From, subscribe, Type} ->
+			add_subscriber(From, Type);
+		
+		%% SWITCH DUTY: publish
+		{From, publish, {MsgType, Msg}} ->
+			do_publish(From, MsgType, Msg);
+	
+		Other ->
+			log(warning, "switch: received unknown message: ", [Other])
+	end,
+	loop_switch().
+
+
 
 
 
@@ -173,27 +286,6 @@ do_publish_list(_CurrentTo, _RestTo, _From, _MsgType, _Msg) ->
 
 
 
-%%
-%% Local Functions
-%%
-
-loop_switch() ->
-	receive
-		{logger, LoggerName} ->
-			put(logger, LoggerName);
-		
-		%% SWITCH DUTY: subscribe
-		{From, subscribe, Type} ->
-			add_subscriber(From, Type);
-		
-		%% SWITCH DUTY: publish
-		{From, publish, {MsgType, Msg}} ->
-			do_publish(From, MsgType, Msg);
-	
-		Other ->
-			log(warning, "switch: received unknown message: ", [Other])
-	end,
-	loop_switch().
 
 
 %% ----------------------          ------------------------------
@@ -212,8 +304,10 @@ log(Severity, Msg, Params) ->
 
 
 
-%% ===============================================================================================
-%% LOCAL FUNCTIONS
+%% ----------------------           ------------------------------
+%%%%%%%%%%%%%%%%%%%%%%%%%  HELPERS  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% ----------------------           ------------------------------
+
 %% I know some of these are located also elsewhere
 %% but I wanted to make this module as stand-alone as possible
 
@@ -236,3 +330,33 @@ add_to_list_no_duplicates(List, Element) ->
 	FilteredList = ListVar      -- [Element],
 	NewListe     = FilteredList ++ [Element],
 	put(List, NewListe).
+
+
+%% @doc Returns the pid() associated with the registered Name
+%%		or atom(undefined).
+%%
+%% @spec get_pid(Name) -> pid() | undefined
+%% where
+%%	Name = atom()
+%%
+get_pid(Name) ->
+	Pid=erlang:whereis(Name),
+	get_pid(Name, Pid).
+
+get_pid(_Name, undefined) ->
+	undefined;
+
+get_pid(Name, Pid) ->
+	case erlang:is_alive(Pid) of
+		true  -> Pid;
+		false -> undefined
+	end.
+
+
+
+%% ----------------------         ------------------------------
+%%%%%%%%%%%%%%%%%%%%%%%%%  TESTS  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% ----------------------         ------------------------------
+
+%% 
+
