@@ -1,28 +1,41 @@
 % Author: Jean-Lou Dupont
 %% Created: 2009-08-25
-%% Description: TODO: Add description to twitter_msgswitch
+%% Description: Message Switch with publish/subscribe strategy
+%%
+%% @doc
+%% == DEPENDENCIES ==
+%%  A 'logger' process for receiving log messages of the form:
+%%
+%%	```
+%%    {log, Severity, Msg, Params}
+%%	'''
+%%
 -module(twitter_switch).
 
--define(LOG, twitter_log).
-
-
-%%
-%% Exported Functions
-%%
+%%=====%%
+%% API %%
+%%=====%%
 -export([
-		 start_link/0,
+		 start_link/0, start_link/1,
 		 subscribe/2,
 		 publish/3
 		 ]).
 
-%% LOCAL
+%% LOCAL... keep compiler happy i.e. no warnings
 -export([
 		 loop_switch/0
 		 ]).
 
+%% @doc Default start with 'logger'
+%%
 start_link() ->
-	%% Register ourselves as message switch
+	start_link([{logger, logger}]).
+
+%% @doc Start with 'logger' parameter
+%%
+start_link([{logger, LoggerName}]) ->
 	Pid = spawn_link(?MODULE, loop_switch, []),
+	Pid ! {logger, LoggerName},
 	register(?MODULE, Pid),
 	{ok, Pid}.
 
@@ -36,55 +49,62 @@ start_link() ->
 %%
 %% @spec subscribe(Type) -> void()
 %% where
+%%	From = atom() %process registered name
 %%	Type = atom()
 %%
-subscribe(From, Type) when is_atom(From) ->
+subscribe(From, Type) when is_atom(From), is_atom(Type) ->
 	to_switch(From, subscribe, Type).
 
 
 
-%% @doc Publish a Message of Type
+%% @doc Publish a Message of a Type
 %%
 %% @spec publish(From, MsgType, Msg) -> void()
 %% where
-%%	From = pid()
-%%	MsgType = atom()
-%%	Msg = list() | atom()
+%%	From = atom()  %process registered name
+%%	Type = atom()
+%%	Msg = list() | atom() | tuple()
 %%
-publish(From, MsgType, Msg) when is_atom(From), is_atom(MsgType) ->
-	to_switch(From, publish, {MsgType, Msg}).
+publish(From, Type, Msg) when is_atom(From), is_atom(Type) ->
+	to_switch(From, publish, {Type, Msg}).
 
 
 
 
-%% !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-%%   INTERNAL
-%% !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+%% ----------------------           ------------------------------
+%%%%%%%%%%%%%%%%%%%%%%%%%  INTERNAL %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% ----------------------           ------------------------------
 
+
+%% @doc Communication bridge with the switch process
+%%
 to_switch(From, Cmd, Msg) ->
 	try ?MODULE ! {From, Cmd, Msg} of
-		{From, Cmd, Msg} -> ok;
-		_Error -> ?LOG:log(critical, "switch: fail to switch {Cmd, Msg}: ",[Cmd,Msg])
+		{From, Cmd, Msg} -> ok
 	catch
-		_X:_Y ->  ?LOG:log(critical, "switch: fail to switch {Cmd, Msg}: ",[Cmd,Msg])
+		_:_ ->  log(critical, "switch: fail to switch {Cmd, Msg}: ",[Cmd,Msg])
 	end.
 
 
-
-%% !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-%%   SHOULD ONLY BE USED BY THE SWITCH PROCESS
-%% !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
+%% @doc Reply to Caller
+%%		Make this as robust as possible since
+%%		the Caller could disappear at any time.
+%%
+%% @spec reply(To, Msg) -> void()
+%% where
+%%	To = pid()
+%%	Msg = atom() | list() | tuple()
+%%
 reply(To, Msg) ->
 	try    To ! Msg
-	catch _:_ -> ?LOG:log(critical, "switch: couldn't reply {To, Msg} ", [To, Msg])
+	catch _:_ -> log(critical, "switch: couldn't reply {To, Msg} ", [To, Msg])
 	end.
 
 
 
 %% Shouldn't occur
 add_subscriber(Client, undefined) when is_atom(Client) ->
-	?LOG:log(critical, "switch: invalid bus type");
+	log(critical, "switch: invalid bus type");
 
 %%
 %% @spec add_subscriber(Client, Type)
@@ -94,25 +114,27 @@ add_subscriber(Client, Type) when is_atom(Type), is_atom(Client) ->
 	do_add_subscriber(Client, Type),
 	reply(Client, {switch, subscribed});
 
-
 add_subscriber(Client, []) when is_atom(Client) ->
 	reply(Client, {switch, subscribed});
 
 add_subscriber(Client, TypeList) when is_atom(Client), is_list(TypeList) ->
 	[H|T] = TypeList,
 	do_add_subscriber(Client, H),
-	add_subscriber(Client, T).
+	add_subscriber(Client, T);
 
+add_subscriber(_, _) ->
+	log(critical, "add_subscriber exception").
 
-
-
-do_add_subscriber(Client, Type) ->
+do_add_subscriber(Client, Type) when is_atom(Type) ->
 	add_to_list_no_duplicates({msgtype, Type}, Client),
-	add_type(Type).
+	add_type(Type);
+
+do_add_subscriber(_,_) ->
+	log(critical, "do_add_subscriber exception").
 
 
-
-%% Adds a Type to the registered MsgTypes list, no duplicates
+%% @doc Adds a Type to the registered MsgTypes list, no duplicates
+%%
 add_type(Type) ->
 	add_to_list_no_duplicates(msgtypes, Type).
 
@@ -120,7 +142,7 @@ add_type(Type) ->
 
 
 do_publish(From, MsgType, Msg) when is_atom(From), is_atom(MsgType) ->
-	ToList = base:getvar({msgtype, MsgType}, []),
+	ToList = getvar({msgtype, MsgType}, []),
 	case ToList of
 		[] -> ok;
 		_ ->
@@ -128,29 +150,26 @@ do_publish(From, MsgType, Msg) when is_atom(From), is_atom(MsgType) ->
 			do_publish_list(To, Rest, From, MsgType, Msg)
 	end.
 
-
-
-%% Finished publishing
 do_publish_list([], [], From, MsgType, _Msg) when is_atom(From), is_atom(MsgType) -> ok;											  
 do_publish_list([], _,  From, MsgType, _Msg) when is_atom(From), is_atom(MsgType) -> ok;											  
 
 
 do_publish_list(CurrentTo, RestTo, From, MsgType, Msg) when is_atom(From), is_atom(MsgType) ->
 	try CurrentTo ! {From, MsgType, Msg} of
-		{From, MsgType, Msg} -> ok;
-		_Error -> ?LOG:log(warning, "switch: publish error, {To, Type, Msg}", [CurrentTo, MsgType, Msg])
+		{From, MsgType, Msg} -> ok
 	catch
-		_X:_Y -> ?LOG:log(warning, "switch: publish error, {To, Type, Msg}", [CurrentTo, MsgType, Msg])			
+		_X:_Y -> log(warning, "switch: publish error (probably a subscriber died), {To, Type, Msg}", [CurrentTo, MsgType, Msg])			
 	end,
 	case RestTo of 
 		[] -> ok;
 		_ ->
 			[NewTo|NewRest] = RestTo,
 			do_publish_list(NewTo, NewRest, From, MsgType, Msg)
-	end.
+	end;
 
 
-
+do_publish_list(_CurrentTo, _RestTo, _From, _MsgType, _Msg) ->
+	log(critical, "do_publish_list exception").
 
 
 
@@ -160,6 +179,9 @@ do_publish_list(CurrentTo, RestTo, From, MsgType, Msg) when is_atom(From), is_at
 
 loop_switch() ->
 	receive
+		{logger, LoggerName} ->
+			put(logger, LoggerName);
+		
 		%% SWITCH DUTY: subscribe
 		{From, subscribe, Type} ->
 			add_subscriber(From, Type);
@@ -169,9 +191,25 @@ loop_switch() ->
 			do_publish(From, MsgType, Msg);
 	
 		Other ->
-			?LOG:log(warning, "switch: received unknown message: ", [Other])
+			log(warning, "switch: received unknown message: ", [Other])
 	end,
 	loop_switch().
+
+
+%% ----------------------          ------------------------------
+%%%%%%%%%%%%%%%%%%%%%%%%%  LOGGER  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% ----------------------          ------------------------------
+
+log(Severity, Msg) ->
+	log(Severity, Msg, []).
+
+log(Severity, Msg, Params) ->
+	Logger=get(logger),
+	try	  Logger ! {log, Severity, Msg, Params}
+	catch
+		_:_ -> io:format("~p: cannot access logger",[?MODULE])
+	end.
+
 
 
 %% ===============================================================================================
