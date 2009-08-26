@@ -397,7 +397,7 @@ inc_stat(Stat, Count) when is_integer(Count) ->
 	Value=?TOOLS:getvar({stat, Stat}, 0),
 	New=Value+Count,
 	put({stat, Stat}, New),
-	New;
+	{Stat, New};
 
 inc_stat(_,_) ->
 	{error, invalid_count}.

@@ -1,28 +1,97 @@
 %% Author: Jean-Lou Dupont
-%% Created: 2009-08-22
+%% Created: 2009-08-25
 %% Description: Logging facility
 %%
-%% 
--module(twitter_log).
+%% Configuration:
+%%	LogName
+%%	LogDir
+%%	
+-module(twitter_log2).
 
--define(DEFAULT_LOG,       "twitter").
--define(DEFAULT_LOG_SIZE,  10*1000*1000).
--define(DEFAULT_LOG_FILES, 10).
--define(LOG,               disk_log).
--define(DEFAULT_DIR,       "/var/log/").
--define(MNG,               twitter_mng).
--define(STAT_OPEN_ERROR,   error_log_open).
--define(STAT_LOG_ERROR,    error_log_msg).
+%% Keep this registered name in order for
+%% other processes to easily interface to it.
+-define(SERVER, logger).
+
+
+-define(DEFAULT_DIR, "/var/log/").
 
 
 %%
 %% Exported Functions
 %%
 -export([
-		 init/0, init/1,
-		 log/1, log/2, log/3,
-		 close/0
+		 start_link/0, start_link/1
 		 ]).
+
+-export([
+		 loop/0
+		,handle/1
+		 ]).
+
+%% ----------------------      ------------------------------
+%%%%%%%%%%%%%%%%%%%%%%%%%  API %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% ----------------------      ------------------------------
+
+%% @doc start_link
+%%		Should be avoided
+%% @spec start_link() -> {ok, Pid}
+%%
+start_link() ->
+	run(?SERVER, ?MODULE).
+
+%% @doc start_link
+%%
+%% @spec start_link(LogName) -> {ok, Pid}
+%%
+start_link([{logfilename, LogName}]) ->
+	run(?SERVER, LogName).
+
+
+%% @private
+run(Server, LogName) ->
+	Pid=spawn_link(?MODULE, loop, []),
+	register(Server, Pid),
+	Server ! {logfilename, LogName},
+	{ok, Pid}.
+
+
+%% ----------------------             ------------------------------
+%%%%%%%%%%%%%%%%%%%%%%%%% SERVER LOOP %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% ----------------------             ------------------------------
+
+%% @private
+loop() ->
+	receive
+		stop   -> handle(stop);
+		reload -> handle(reload);
+		{logfilename, LogName} -> handle({start, LogName})
+	end,
+	loop().
+
+
+%% ----------------------          ------------------------------
+%%%%%%%%%%%%%%%%%%%%%%%%% HANDLERS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% ----------------------         ------------------------------
+
+handle({start, LogName}) ->
+	ok;
+
+handle(stop) ->
+	exit(ok);
+
+%% @doc Handle 'reload' event
+%%
+handle(reload) ->
+	ok;
+
+handle(_) ->
+	ok.
+
+
+
+%%
+%% Local Functions
+%%
 
 %%
 %% API Functions
@@ -130,3 +199,6 @@ close() ->
 
 
 
+%% ----------------------             ------------------------------
+%%%%%%%%%%%%%%%%%%%%%%%%% SERVER LOOP %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% ----------------------             ------------------------------
