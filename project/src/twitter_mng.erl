@@ -387,6 +387,13 @@ get_stats() ->
 	get_dicclass(stat).
 
 
+%% @doc Increment a statistics counter Stat by 1
+%%
+%% @spec inc_stat(Stat) -> {Stat, NewCount}
+%% where
+%%	Stat = atom()
+%%	NewCount = integer()
+%%
 inc_stat(Stat) ->
 	inc_stat(Stat, 1).
 
