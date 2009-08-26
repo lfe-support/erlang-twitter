@@ -68,7 +68,7 @@
 			{log,2},
 			{getvar, 2}, {getvar, 3},
 			{add_to_list_no_duplicates,2},
-			{tstart,5}, {tloop, 5},
+			{tstart,6}, {tloop, 5},
 			{kstart,1}, {kloop, 1}
 		]}).
 
@@ -143,7 +143,7 @@ subscribe(Types) when is_list(Types) ->
 	to_switch(self(), subscribe, Types);
 
 subscribe(Other) ->
-	{error, {invalid_parameter, Other}}.
+	{error, {invalid_type, Other}}.
 	
 
 
@@ -156,7 +156,10 @@ subscribe(Other) ->
 %%
 publish(Type, Msg) when is_atom(Type) ->
 	check_sync(),
-	to_switch(self(), publish, {Type, Msg}).
+	to_switch(self(), publish, {Type, Msg});
+
+publish(Type, _Msg) ->
+	{error, {invalid_type, Type}}.
 
 
 
@@ -197,10 +200,10 @@ timer_tick(CallerPid, PreviousSwitchPid) ->
 	CurrentSwitchPid=get_pid(?SERVER),
 	compare_switch_pids(CallerPid, PreviousSwitchPid, CurrentSwitchPid).
 
-compare_switch_pids(_CallerPid,  _,         undefined) -> switch_unreachable;
-compare_switch_pids(CallerPid, undefined, _)           -> send_out_of_sync(CallerPid); % must allow for re-subscribe
-compare_switch_pids(_CallerPid, X, X)                  -> in_sync;
-compare_switch_pids(CallerPid, _, _)                   -> send_out_of_sync(CallerPid).
+compare_switch_pids(_CallerPid,  _,       undefined) -> switch_unreachable;
+compare_switch_pids(CallerPid, undefined, _)         -> send_out_of_sync(CallerPid); % must allow for re-subscribe
+compare_switch_pids(_CallerPid, X, X)                -> in_sync;
+compare_switch_pids(CallerPid, _, _)                 -> send_out_of_sync(CallerPid).
 	
 	
 send_out_of_sync(CallerPid) ->
@@ -287,6 +290,11 @@ do_add_subscriber(_,_) ->
 	log(critical, "do_add_subscriber exception").
 
 
+rem_subscriber(MsgType, CurrentTo) ->
+	rem_from_list({msgtype, MsgType}, CurrentTo).
+
+
+
 %% @doc Adds a Type to the registered MsgTypes list, no duplicates
 %%
 add_type(Type) ->
@@ -316,7 +324,10 @@ do_publish_list(CurrentTo, RestTo, From, MsgType, Msg) when is_pid(From) ->
 	try CurrentTo ! {From, MsgType, Msg} of
 		{From, MsgType, Msg} -> ok
 	catch
-		_X:_Y -> log(warning, "switch: publish error (probably a subscriber died), {To, Type, Msg}", [CurrentTo, MsgType, Msg])			
+		_X:_Y -> 
+			io:format("removed [~p]~n", [CurrentTo]),
+			rem_subscriber(MsgType, CurrentTo),
+			log(warning, "switch: publish error (probably a subscriber died), {To, Type, Msg}", [CurrentTo, MsgType, Msg])			
 	end,
 	case RestTo of 
 		[] -> ok;
@@ -345,7 +356,7 @@ log(Severity, Msg, Params) ->
 	try	  Logger ! {log, Severity, Msg, Params}
 	catch
 		_:_ -> 
-			io:format("~p: ~p ~p ~n",[?MODULE, Msg, Params])
+			io:format("~p: [~p] ~p ~p ~n",[?MODULE, Severity, Msg, Params])
 	end.
 
 
@@ -377,6 +388,16 @@ add_to_list_no_duplicates(List, Element) ->
 	NewListe     = FilteredList ++ [Element],
 	put(List, NewListe).
 
+rem_from_list(List, Elements) when is_list(Elements) ->
+	ListVar=getvar(List, []),
+	FilteredList = ListVar -- Elements,
+	put(List, FilteredList);
+	
+rem_from_list(List, Element) ->
+	ListVar=getvar(List, []),
+	FilteredList = ListVar -- [Element],
+	put(List, FilteredList).
+
 
 %% @doc Returns the pid() associated with the registered Name
 %%		or atom(undefined).
@@ -407,17 +428,18 @@ get_pid(_Name, Pid) ->
 %% 
 test() ->
 	%%?MODULE:start_link(),
-	tstart(2000, bus1, {msg, "From Proc 1"}, 1, [bus1, bus2]),
-	tstart(2500, bus1, {msg, "From Proc 2"}, 2, [bus1, bus2]),
-	tstart(3000, bus1, {msg, "From Proc 3"}, 3, [bus1, bus2]),
-	tstart(1000, bus2, {msg, "From Proc 4"}, 4, [bus2]),
-	tstart(1000, bus2, {msg, "From Proc 5"}, 5, [bus2]),
+	tstart(n1, 2000, bus1, {msg, "From Proc 1"}, 1, [bus1, bus2]),
+	tstart(n2, 2500, bus1, {msg, "From Proc 2"}, 2, [bus1, bus2]),
+	tstart(n3, 3000, bus1, {msg, "From Proc 3"}, 3, [bus1, bus2]),
+	tstart(n4, 1000, bus2, {msg, "From Proc 4"}, 4, [bus2]),
+	tstart(n5, 1000, bus2, {msg, "From Proc 5"}, 5, [bus2]),
 	kstart(30000),
 	ok.
 
 
-tstart(Delay, Type, Msg, Id, Busses) ->
+tstart(Name, Delay, Type, Msg, Id, Busses) ->
 	Pid=spawn(?MODULE, tloop, [Delay, Type, Msg, Id, Busses]),
+	register(Name, Pid),
 	Pid ! start,
 	{ok, Pid}.
 
