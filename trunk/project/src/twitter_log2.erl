@@ -3,18 +3,41 @@
 %% Description: Logging facility
 %%
 %% Configuration:
-%%	LogName
-%%	LogDir
+%%	LogFileName
+%%
+%% Potential Configuration:
+%%	MaxLogSize
+%%  MaxLogFiles
 %%	
+%% == MESSAGE API ==
+%% In order to simplify interfacing to this logger module,
+%% a message based API is provided. A client can send a 
+%% tuple to the registered named process 'logger':
+%% ```
+%%	{log, Severity, Msg, Params}
+%% '''
+%% 
 -module(twitter_log2).
 
 %% Keep this registered name in order for
 %% other processes to easily interface to it.
 -define(SERVER, logger).
 
+%% Log unique identifier
+-define(DEFAULT_LOG,  loggerid).
 
--define(DEFAULT_DIR, "/var/log/").
+%% Default dir (*nix)
+-define(DEFAULT_DIR,  "/var/log/").
 
+%% The system disk logger module
+-define(LOG, disk_log).
+
+%% Defaults
+-define(DEFAULT_MAX_LOG_SIZE,  10*1000*1000).
+-define(DEFAULT_MAX_LOG_FILES, 10).
+
+-define(STAT_OPEN_ERROR, error_open_log).
+-define(STAT_LOG_ERROR,  error_log_write).
 
 %%
 %% Exported Functions
@@ -32,26 +55,37 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%  API %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% ----------------------      ------------------------------
 
-%% @doc start_link
-%%		Should be avoided
+%% @doc Default start
+%%		Should be avoided because of probably unhelpful
+%%		log file name.
+%%
 %% @spec start_link() -> {ok, Pid}
 %%
 start_link() ->
-	run(?SERVER, ?MODULE).
+	Filepath=?DEFAULT_DIR++erlang:atom_to_list(?MODULE)++".log",
+	run(?SERVER, Filepath).
 
 %% @doc start_link
 %%
-%% @spec start_link(LogName) -> {ok, Pid}
+%% @spec start_link([{logfilename,LogName}]) -> {ok, Pid}
+%% where
+%%	LogName = string()  %% absolute filename path
 %%
-start_link([{logfilename, LogName}]) ->
-	run(?SERVER, LogName).
+start_link([{logfilename, LogName}]) when length(LogName)>0 ->
+	run(?SERVER, LogName);
+
+start_link([{logfilename, LogName}]) when length(LogName)==0 ->
+	{error, logfilename};
+
+start_link(Other) ->
+	{error, {invalid_parameter, Other}}.
 
 
 %% @private
 run(Server, LogName) ->
 	Pid=spawn_link(?MODULE, loop, []),
 	register(Server, Pid),
-	Server ! {logfilename, LogName},
+	Server ! {start, LogName},
 	{ok, Pid}.
 
 
@@ -62,9 +96,19 @@ run(Server, LogName) ->
 %% @private
 loop() ->
 	receive
+		
 		stop   -> handle(stop);
 		reload -> handle(reload);
-		{logfilename, LogName} -> handle({start, LogName})
+		
+		%% API message
+		{log, Severity, Msg, Params} -> 
+			handle({log, Severity, Msg, Params});
+		
+		{start, LogName} -> 
+			handle({start, LogName});
+		
+		Other -> 
+			handle({log, critical, "logger: unhandled message: ", [Other]}) 
 	end,
 	loop().
 
@@ -74,7 +118,8 @@ loop() ->
 %% ----------------------         ------------------------------
 
 handle({start, LogName}) ->
-	ok;
+	put(logfilename, LogName),
+	init();
 
 handle(stop) ->
 	exit(ok);
@@ -82,8 +127,13 @@ handle(stop) ->
 %% @doc Handle 'reload' event
 %%
 handle(reload) ->
-	ok;
+	init();
 
+handle({log, Severity, Msg, Params}) ->
+	log(Severity, Msg, Params);
+
+%% @doc Exception... not much can be done...
+%%
 handle(_) ->
 	ok.
 
@@ -96,25 +146,20 @@ handle(_) ->
 %%
 %% API Functions
 %%
-init() ->
-	init(?DEFAULT_DIR++?DEFAULT_LOG++".log").
-
-init(LogFileName) when length(LogFileName)==0 ->
-	init(?DEFAULT_DIR++?DEFAULT_LOG++".log"); %% easily portable
 
 %% Initializes the log file
 %% - closes (or attempts) to close the current log file
 %% - opens the specified log
 %% - sets the process variables
 %%
-init(LogFileName) ->
+init() ->
 	CurrentLog=get(log),
 	
 	%% ignore return code
 	_Ret=?LOG:close(CurrentLog),
 	
-	%%io:format("Ret: ~p~n",[Ret]),
-
+	LogFileName=get(logfilename),
+	
 	%% opens the log...
 	Params=[
 		{name,    ?DEFAULT_LOG}
@@ -123,7 +168,7 @@ init(LogFileName) ->
 		,{type,   wrap}
 		,{mode,   read_write}
 		,{format, external}
-		,{size,   {?DEFAULT_LOG_SIZE, ?DEFAULT_LOG_FILES}}
+		,{size,   {?DEFAULT_MAX_LOG_SIZE, ?DEFAULT_MAX_LOG_FILES}}
 		,{repair, true}		   
 	],
 	Ret2=?LOG:open(Params),
@@ -134,7 +179,7 @@ init(LogFileName) ->
 %% @doc Records log open errors
 %%
 process_open({error, _Reason}) ->
-	?MNG:inc_stat(?STAT_OPEN_ERROR);
+	inc_stat(?STAT_OPEN_ERROR);
 
 process_open({ok, Log}) ->
 	%%io:format("process_open: log: ~p~n", [Log]),
@@ -144,7 +189,7 @@ process_open({repaired, Log, _}) ->
 	put(log, Log);
 
 process_open(_) ->
-	?MNG:inc_stat(?STAT_OPEN_ERROR).
+	inc_stat(?STAT_OPEN_ERROR).
 
 
 %% @doc Log a message with 'info' severity
@@ -167,7 +212,7 @@ log(Severity, Msg, Params) ->
 
 dolog(_Severity, undefined, _, _Params) ->
 	io:format("Logger undefined!~n"),
-	?MNG:inc_stat(?STAT_LOG_ERROR);
+	inc_stat(?STAT_LOG_ERROR);
 
 dolog(Severity, Logger, Msg, []) ->
 	{{Year,Month,Day},{Hour,Min,Sec}} = calendar:now_to_datetime(erlang:now()),
@@ -184,12 +229,11 @@ dolog(Severity, Logger, Msg, Params) ->
 
 
 
-record_result(ok) ->
-	ok;
+record_result(ok) -> ok;
 
 record_result(Result) ->
 	io:format("Log error: ~p~n",[Result]),
-	?MNG:inc_stat(?STAT_LOG_ERROR).
+	inc_stat(?STAT_LOG_ERROR).
 
 
 	
@@ -198,7 +242,33 @@ close() ->
 	?LOG:close(Log).
 
 
+%% ----------------------         ------------------------------
+%%%%%%%%%%%%%%%%%%%%%%%%% HELPERS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% ----------------------         ------------------------------
 
-%% ----------------------             ------------------------------
-%%%%%%%%%%%%%%%%%%%%%%%%% SERVER LOOP %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% ----------------------             ------------------------------
+inc_stat(Stat) ->
+	inc_stat(Stat, 1).
+
+
+%% @doc Increments an internal 'statistics' variable 'Stat' by 'Count'
+%%      and returns the new count.
+inc_stat(Stat, Count) when is_integer(Count) ->
+	Value=getvar({stat, Stat}, 0),
+	New=Value+Count,
+	put({stat, Stat}, New),
+	{Stat, New};
+
+inc_stat(_,_) ->
+	{error, invalid_count}.
+
+getvar(VarName, Default) ->
+	VarValue=get(VarName),
+	getvar(VarName, VarValue, Default).
+
+getvar(VarName, undefined, Default) ->
+	put(VarName, Default),
+	Default;
+
+getvar(_VarName, VarValue, _Default) ->
+	VarValue.
+
