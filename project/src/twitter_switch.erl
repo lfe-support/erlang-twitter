@@ -113,7 +113,14 @@ start_link([{logger, LoggerName}]) ->
 	{ok, Pid}.
 
 stop() ->
-	?MODULE ! stop.
+	try
+		?SERVER ! stop,
+		ok
+	catch
+		_:_ ->
+			{error, cannot_stop}
+	end.
+
 
 
 %% @doc Subscribe a Client to a Type of message
@@ -449,12 +456,13 @@ kloop(Delay) ->
 		
 	after Delay ->
 
-		try
-			SPid = get_pid(?SERVER),
-			SPid ! stop
-		catch
-			_:_ ->
-				?MODULE:start_link()
+		io:format("Attempting switch kill [~p]~n", [now()]),			
+		case ?MODULE:stop() of
+			ok ->
+				ok;
+			_ ->
+				io:format("Attempting switch restart [~p]~n", [now()]),
+				?MODULE:start_link()	
 		end
 	
 	end,	
