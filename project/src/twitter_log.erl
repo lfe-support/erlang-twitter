@@ -31,6 +31,7 @@
 %%  </ul>
 
 -module(twitter_log).
+-compile({nowarn_unused_function, [loop, handle]}).
 
 %% Keep this registered name in order for
 %% other processes to easily interface to it.
@@ -53,7 +54,7 @@
 -define(STAT_LOG_ERROR,  error_log_write).
 
 %%
-%% Exported Functions
+%% API Exported Functions
 %%
 -export([
 		 start_link/0, start_link/1,
@@ -61,10 +62,6 @@
 		 log/1, log/2
 		 ]).
 
--export([
-		 loop/0
-		,handle/1
-		 ]).
 
 %% ----------------------      ------------------------------
 %%%%%%%%%%%%%%%%%%%%%%%%%  API %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
