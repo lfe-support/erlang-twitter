@@ -64,11 +64,12 @@
 			{add_subscriber,2},
 			{do_add_subscriber,2},
 			{add_type,1},
-			{do_publish,3}, {do_publish_list,5},
+			{do_publish,3}, {do_publish_list,4},
 			{log,2},
 			{getvar, 2}, {getvar, 3},
 			{add_to_list_no_duplicates,2},
-			{tstart,6}, {tloop, 5},
+			%%{tstart,6}, 
+			{tloop, 5},
 			{kstart,1}, {kloop, 1}
 		]}).
 
@@ -96,7 +97,8 @@
 %% TEST RELATED
 %%
 -export([
-		 test/0, tloop/5, kloop/1
+		 test/0, tloop/5, kloop/1,
+		 tstart/6
 		 ]).
 
 %% @doc Default start with 'logger'
@@ -172,10 +174,15 @@ publish(Type, _Msg) ->
 check_sync() ->
 	%% clear any outstanding timer
 	%% because we are going to set one anyway
+	kill_timer(),
+	set_timer().
+
+
+kill_timer() ->
 	OldTimer=get({switch.timer}),
 	erase({switch.timer}),
-	timer:cancel(OldTimer),
-	set_timer().
+	timer:cancel(OldTimer).
+	
 
 set_timer() ->
 	SwitchPid=get_pid(?SERVER),
@@ -197,8 +204,10 @@ set_timer() ->
 %%	PreviousSwitchPid = pid() % the pid() of the switch as it was before starting the timer
 %%
 timer_tick(CallerPid, PreviousSwitchPid) ->
+	kill_timer(),
 	CurrentSwitchPid=get_pid(?SERVER),
-	compare_switch_pids(CallerPid, PreviousSwitchPid, CurrentSwitchPid).
+	compare_switch_pids(CallerPid, PreviousSwitchPid, CurrentSwitchPid),
+	set_timer().
 
 compare_switch_pids(_CallerPid,  _,       undefined) -> switch_unreachable;
 compare_switch_pids(CallerPid, undefined, _)         -> send_out_of_sync(CallerPid); % must allow for re-subscribe
@@ -233,7 +242,7 @@ to_switch(From, Cmd, Msg) ->
 	catch
 		_:_ ->
 			%% Safely sends a message back to the caller
-			reply(From, {switch, unreachable})
+			reply(From, {switch, unreachable, {Cmd, Msg}})
 			%%log(critical, "switch: fail to switch {Cmd, Msg}: ",[Cmd,Msg])
 	end.
 
@@ -241,8 +250,7 @@ to_switch(From, Cmd, Msg) ->
 
 loop_switch() ->
 	receive
-		stop ->
-			exit(ok);
+		stop ->	exit(ok);
 		
 		{logger, LoggerName}    -> put(logger, LoggerName);
 		{From, subscribe, Type} -> add_subscriber(From, Type);
@@ -282,6 +290,8 @@ add_subscriber(Client, TypeList) when is_pid(Client), is_list(TypeList) ->
 add_subscriber(_, _) ->
 	log(critical, "add_subscriber exception").
 
+
+
 do_add_subscriber(Client, Type) when is_atom(Type) ->
 	add_to_list_no_duplicates({msgtype, Type}, Client),
 	add_type(Type);
@@ -290,8 +300,9 @@ do_add_subscriber(_,_) ->
 	log(critical, "do_add_subscriber exception").
 
 
-rem_subscriber(MsgType, CurrentTo) ->
-	rem_from_list({msgtype, MsgType}, CurrentTo).
+
+rem_subscriber(MsgType, Client) ->
+	rem_from_list({msgtype, MsgType}, Client).
 
 
 
@@ -305,43 +316,49 @@ add_type(Type) ->
 
 do_publish(From, MsgType, Msg) when is_pid(From), is_atom(MsgType) ->
 	ToList = getvar({msgtype, MsgType}, []),
-	case ToList of
-		[] -> ok;
-		_ ->
-			[To|Rest] = ToList,
-			do_publish_list(To, Rest, From, MsgType, Msg)
-	end;
+	%io:format("do_publish: From[~p] To[~p] Type[~p] Msg[~p]~n", [From, ToList, MsgType, Msg]),	
+	do_publish_list(ToList, From, MsgType, Msg);
 
 do_publish(From, Type, _Msg) ->
 	error_logger:error_msg("~p: do_publish exception, From[~p] Type[~p]~n",[?MODULE, From, Type]).
 
 
-do_publish_list([], [], From, _MsgType, _Msg) when is_pid(From) -> ok;											  
-do_publish_list([], _,  From, _MsgType, _Msg) when is_pid(From) -> ok;											  
+
+do_publish_list([], _From, _MsgType, _Msg) -> ok;
+do_publish_list(List,From, MsgType, Msg) when is_list(List) ->
+	[To|Rest] = List,
+	publish_one(To, From, MsgType, Msg),
+	do_publish_list(Rest, From, MsgType, Msg);
+
+do_publish_list(Unknown, From, Type, Msg) ->
+	log(critical, "do_publish_list exception {Unknown, From, Type, Msg}", [Unknown, From, Type, Msg]).
 
 
-do_publish_list(CurrentTo, RestTo, From, MsgType, Msg) when is_pid(From) ->
-	try CurrentTo ! {From, MsgType, Msg} of
+
+publish_one(X, X, _MsgType, _Msg) -> not_to_self;
+	%io:format("publish_one: not to self [~p]~n", [X]);
+
+publish_one(To, From, MsgType, Msg) ->
+	Alive=erlang:is_process_alive(To),
+	publish_one_safe(Alive, To, From, MsgType, Msg).
+
+	
+	
+publish_one_safe(false, To, _From, MsgType, Msg) ->
+	io:format("removed [~p]~n", [To]),
+	rem_subscriber(MsgType, To),
+	log(warning, "switch: publish error (probably a subscriber died), {To, Type, Msg}", [To, MsgType, Msg]);
+
+publish_one_safe(true, To, From, MsgType, Msg) ->
+	try To ! {From, MsgType, Msg} of
 		{From, MsgType, Msg} -> ok
 	catch
 		_X:_Y -> 
-			io:format("removed [~p]~n", [CurrentTo]),
-			rem_subscriber(MsgType, CurrentTo),
-			log(warning, "switch: publish error (probably a subscriber died), {To, Type, Msg}", [CurrentTo, MsgType, Msg])			
-	end,
-	case RestTo of 
-		[] -> ok;
-		_ ->
-			[NewTo|NewRest] = RestTo,
-			do_publish_list(NewTo, NewRest, From, MsgType, Msg)
-	end;
-
-
-do_publish_list(_CurrentTo, _RestTo, _From, _MsgType, _Msg) ->
-	log(critical, "do_publish_list exception").
-
-
-
+			io:format("removed [~p]~n", [To]),
+			rem_subscriber(MsgType, To),
+			log(warning, "switch: publish error (probably a subscriber died), {To, Type, Msg}", [To, MsgType, Msg])			
+	end.
+	
 
 
 %% ----------------------          ------------------------------
@@ -427,12 +444,12 @@ get_pid(_Name, Pid) ->
 
 %% 
 test() ->
-	%%?MODULE:start_link(),
-	tstart(n1, 2000, bus1, {msg, "From Proc 1"}, 1, [bus1, bus2]),
-	tstart(n2, 2500, bus1, {msg, "From Proc 2"}, 2, [bus1, bus2]),
-	tstart(n3, 3000, bus1, {msg, "From Proc 3"}, 3, [bus1, bus2]),
-	tstart(n4, 1000, bus2, {msg, "From Proc 4"}, 4, [bus2]),
-	tstart(n5, 1000, bus2, {msg, "From Proc 5"}, 5, [bus2]),
+	tstart(n1, 1000, bus1, "From Proc 1 ", 1, [bus1]),
+	tstart(n2, 2100, bus1, "From Proc 2 ", 2, [bus1]),
+	tstart(n3, 3200, bus1, "From Proc 3 ", 3, [bus1]),
+	tstart(n4, 1300, bus2, "From Proc 4 ", 4, [bus2]),
+	tstart(n5, 2400, bus2, "From Proc 5 ", 5, [bus2]),
+	tstart(n6, 3400, bus2, "From Proc 6 ", 6, [bus2]),	
 	kstart(30000),
 	ok.
 
@@ -445,21 +462,30 @@ tstart(Name, Delay, Type, Msg, Id, Busses) ->
 
 tloop(Delay, Type, Msg, Id, Busses) ->
 	receive
-		{From, MsgType, Msg} ->
-			io:format("From[~p] MsgType[~p] Msg[~p]~n",[From, MsgType, Msg]);
-		
 		stop  -> exit(ok);
 		start -> subscribe(Busses);
 
 		{switch, out_of_sync} ->
-			io:format("out-of-sync received [~p]~n", [now()]),
+			%io:format("out-of-sync received [~p]~n", [now()]),
 			subscribe(Busses);
 			
-		{switch, subscribed} ->
-			io:format("subscribed, id[~p]~n", [Id])
+		{switch, unreachable, {subscribe, _}} -> %ok;
+			io:format("switch unreachable SUBSCRIBE!~n");
+
+		{switch, unreachable, {publish, _}} -> ok;
+			%io:format("switch unreachable SUBSCRIBE!~n");
+
+		{switch, subscribed} -> ok;
+			%io:format("subscribed, id[~p]~n", [Id]);
+
+		{From, MsgType, Message} ->
+			io:format("id[~p] From[~p] MsgType[~p] Msg[p]~n",[Id, From, MsgType]);
+		
+		Other ->
+			io:format("Unknown msg[~p]~n", [Other])
 	
 	after Delay ->
-		%%io:format("publishing, id[~p]~n", [Id]),
+		io:format("publishing, from id[~p] pid[~p]~n", [Id, self()]),
 		publish(Type, Msg)
 			
 	end,
