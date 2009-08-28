@@ -17,7 +17,7 @@
 %% == Message Publication ==
 %% Messages are sent to the Subscribers using the following format:
 %% ```
-%%	 {From, Bus, Msg}
+%%	 {hwswitch, From, Bus, Msg}
 %% '''
 %% where 'From' is the pid() of the publisher process.
 %%
@@ -160,8 +160,8 @@ publish_one_safe(false, To, _From, _Bus, _Msg) ->
 
 publish_one_safe(true, To, From, Bus, Msg) ->
 	%%io:format("publish_one: To[~p] From[~p] Bus[~p] Msg[~p]~n",[To, From, Bus, Msg]),
-	try To ! {From, Bus, Msg} of
-		{From, Bus, Msg} -> ok
+	try To ! {hwswitch, From, Bus, Msg} of
+		{hwswitch, From, Bus, Msg} -> ok
 	catch
 		_X:_Y ->
 			%% If this is a recurring condition,
