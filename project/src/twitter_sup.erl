@@ -12,7 +12,7 @@
 %% --------------------------------------------------------------------
 -export([
 	 init/1,
-	 start_link/0,	 
+	 start_link/0,
 	 start_link/1
         ]).
 
@@ -23,7 +23,7 @@ start_link() ->
 	start_link([]).
 
 start_link(Args) ->
-	process_flag(trap_exit,true),
+	process_flag(trap_exit, true),
 	supervisor:start_link({local, ?MODULE}, ?MODULE, Args).
 
 %% --------------------------------------------------------------------
@@ -34,13 +34,18 @@ start_link(Args) ->
 %% --------------------------------------------------------------------
 init(_Args) ->
 	
+	%% HWSwitch Subscriptions
+	Switch_Subs = [{}, {}],
+	
+	
     Child_logger = {twitter_log,{twitter_log, start_link,[{logfilename, "/var/log/twitter.log"}]},
 	      permanent,2000,worker,[twitter_log]},
 
+    Child_switch = {twitter_hwswitch,{twitter_hwswitch, start_link,[Switch_Subs]},
+	      permanent,2000,worker,[twitter_hwswitch]},
 
 	
-    {ok,{{one_for_one,5,1}, [
-							 Child_logger
-
-							]}}.
+	Children = [Child_logger, Child_switch],
+	
+    {ok,{{one_for_one,5,1}, Children }}.
 

@@ -54,6 +54,7 @@
 		 
 		 make_atom_from_list/1,  make_atom_from_list/2
 		 ,vsize/1
+		 ,is_alive/1, is_alive/2
 		 ]).
 
 %%
@@ -436,3 +437,17 @@ vsize(Tuple) when is_tuple(Tuple) ->
 
 vsize(_) ->
 	undefined.
+
+
+is_alive(Name) ->
+	Pid=erlang:whereis(Name),
+	is_alive(Name, Pid).
+
+is_alive(_Name, undefined) ->
+	false;
+
+is_alive(_Name, Pid) when is_pid(Pid) ->
+	erlang:is_process_alive(Pid);
+
+is_alive(_,_) ->
+	false.
