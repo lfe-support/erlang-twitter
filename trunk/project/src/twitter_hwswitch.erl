@@ -14,8 +14,21 @@
 %%  where 'busX' is a unique atom() representing a communication 'bus'
 %%  and 'Sn' is a registered atom() name associated with a Client process (i.e. subscriber to bus).
 %%
+%% == Message Publication ==
+%% Messages are sent to the Subscribers using the following format:
+%% ```
+%%	 {From, Bus, Msg}
+%% '''
+%% where 'From' is the pid() of the publisher process.
+%%
 %% == Usage Note ==
 %% This module is meant to be started through a Supervisor.
+%%
+%% == Switch Down ==
+%%
+%% If the switch process dies and clients try to send messages
+%% through it, the module responds with a {hswitch.bound, Bus, Msg}
+%% message back to the caller.
 %%
 -module(twitter_hwswitch).
 -compile({nowarn_unused_function, [
@@ -67,14 +80,22 @@ start_link(Subs) when is_list(Subs) ->
 start_link(U) ->
 	{error, {unknown_param, U}}.
 
-
+%% @doc Publishes a Message on a Bus
+%%		Sends a
+%%		```
+%%			{hwswitch.bounce, Bus, Msg}
+%%		'''
+%%		back to the caller if the switch is unreachable.
+%%
+%% @spec publish(Bus, Msg) -> ok | {error, hwswitch.unreachable}
+%%
 publish(Bus, Msg) ->
 	try
 		?SERVER ! {publish, self(), Bus, Msg},
 		ok
 	catch
 		_:_ ->
-			self() ! {hwswitch, unreachable},
+			self() ! {hwswitch.bounce, Bus, Msg},
 			{error, hwswitch.unreachable}
 	end.
 
@@ -124,23 +145,23 @@ hpublish2([To|Rest], From, Bus, Msg) ->
 	hpublish2(Rest, From, Bus, Msg).
 
 
-publish_one(X, X, _MsgType, _Msg) -> not_to_self;
+publish_one(X, X, _Bus, _Msg) -> not_to_self;
 	%io:format("publish_one: not to self [~p]~n", [X]);
 
-publish_one(To, From, MsgType, Msg) ->
+publish_one(To, From, Bus, Msg) ->
 	Alive=is_alive(To),
-	publish_one_safe(Alive, To, From, MsgType, Msg).
+	publish_one_safe(Alive, To, From, Bus, Msg).
 
 	
 	
-publish_one_safe(false, To, _From, _MsgType, _Msg) ->
+publish_one_safe(false, To, _From, _Bus, _Msg) ->
 	log(warning, "switch: publish error (probably a subscriber died), To:", [To]);
 
 
-publish_one_safe(true, To, From, MsgType, Msg) ->
-	%%io:format("publish_one: To[~p] From[~p] Type[~p] Msg[~p]~n",[To, From, MsgType, Msg]),
-	try To ! {From, MsgType, Msg} of
-		{From, MsgType, Msg} -> ok
+publish_one_safe(true, To, From, Bus, Msg) ->
+	%%io:format("publish_one: To[~p] From[~p] Bus[~p] Msg[~p]~n",[To, From, Bus, Msg]),
+	try To ! {From, Bus, Msg} of
+		{From, Bus, Msg} -> ok
 	catch
 		_X:_Y ->
 			%% If this is a recurring condition,
