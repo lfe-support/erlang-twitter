@@ -6,10 +6,13 @@
 %%
 %% This module's primary function is to correlate the modules configuration version
 %% with that advertised through the message 'sys.config'.
+%%
 %% Each module advertises its current configuration version and a configuration master
 %% (usually the module Config) sends out 'sys.config' message indicating the currently
-%% in-force configuration version.  When all modules advertise their compliance to
-%% the in-force configuration, this module generates:
+%% in-force configuration version.  
+%%
+%% When all modules advertise their compliance to the in-force configuration, 
+%% this module generates:
 %% ```
 %%  {app, sys, app.ready}
 %% '''
@@ -22,15 +25,10 @@
 %%  <li>Listens for 'sys.config.</li>
 %%  <li>Generates 'sys.app.ready'</li>
 %% </ul>
-%%
-%%
-%% <ul>
-%%  <li></li>
-%% </ul>
 
 -module(twitter_app).
 
--define(SERVER, app).
+-define(SERVER, twitter_app).
 -define(SWITCH, twitter_hwswitch).
 -define(BUSSES, [sys, clock]).
 
@@ -47,6 +45,7 @@
 %%
 -export([
 		 loop/0
+		,check/0
 		 ]).
 
 %%
@@ -61,11 +60,14 @@
 %% ----------------------              ------------------------------
 %%%%%%%%%%%%%%%%%%%%%%%%%  Management  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% ----------------------              ------------------------------
-start_link(Modules) ->
+start_link(Modules) when is_list(Modules)->
 	Pid=spawn_link(?MODULE, loop, []),
 	register(?SERVER, Pid),
 	Pid ! {start, Modules},
-	{ok, Pid}.
+	{ok, Pid};
+
+start_link(_) ->
+	{error, invalid_param}.
 
 stop() ->
 	try 
@@ -85,11 +87,11 @@ loop() ->
 		
 		%%% MANAGEMENT RELATED %%%
 		{start, Modules} ->
+			put(modules.count, length(Modules)),
 			put(modules, Modules);
 		
 		stop ->
 			exit(normal);
-	
 	
 		%%% LOCAL SWITCH RELATED %%%
 		{hwswitch, From, Bus, Msg} ->
@@ -106,29 +108,68 @@ loop() ->
 
 
 %% A module advertises its configuration version
-handle({hwswitch, _From, sys, {mod.config, Version}}) ->
-	ok;
+handle({hwswitch, From, sys, {mod.config, Version}}) ->
+	put({mod.version, From}, Version),
+	check();
 
 %% The in-force configuration version is announced
 handle({hwswitch, _From, sys, {config, Version}}) ->
-	ok;
+	put(config.version, Version),
+	check();
+	
+handle({hwswitch, _From, clock, {tick.min, _Count}}) ->
+	check();
 
-handle({hwswitch, _From, clock, {tick.min, Count}}) ->
-	ok;
-
-handle({hwswitch, _From, clock, {tick.sync, Count}}) ->
-	ok;
-
-
-handle({hwswitch, _From, sys, reload}) ->
-	ok;
+handle({hwswitch, _From, clock, {tick.sync, _Count}}) ->
+	check();
 
 handle(Other) ->
 	log(warning, "Unexpected message: ", [Other]).
 
 
+%% ----------------------          ------------------------------
+%%%%%%%%%%%%%%%%%%%%%%%%%  LOCALS  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% ----------------------          ------------------------------
+
+%% @doc Performs a correlation check
+%%
+check() ->
+	Version=get(config.version),
+	Modules=get(modules),
+	check(Modules, Version, 1).
+
+check([], _, _) ->
+	end_list;
+
+check(_, undefined, _) ->
+	no_version_in_force;
+
+check([Module|Rest], Version, Count) ->
+	ModVersion=get({mod.version, Module}),
+	check_one(Version, ModVersion, Count),
+	check(Rest, Version, Count+1).
 
 
+check_one(Version, ModVersion, Count) ->
+	
+	%% Version match?
+	case Version==ModVersion of
+		true ->
+			maybe_generate_ready(Count);
+		false ->
+			ok
+	end.
+
+maybe_generate_ready(Count) ->
+	TotalCount=get(modules.count),
+	maybe_generate_ready(Count, TotalCount).
+
+%% cycled through all modules and versions match?
+maybe_generate_ready(X, X) ->
+	?SWITCH:publish(sys, app.ready);
+
+maybe_generate_ready(_, _) ->
+	version_no_match.
 
 
 
