@@ -92,7 +92,7 @@ loop() ->
 			do_sync();
 		
 		Other ->
-			log(warning, "Unexpected message: ", [Other])
+			log(warning, "clock: unexpected message: ", [Other])
 	
 	after ?MINUTE ->
 			

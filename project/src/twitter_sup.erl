@@ -54,8 +54,12 @@ init(_Args) ->
 	Child_app = {twitter_app,{twitter_app, start_link,[Modules]},
 	      permanent,2000,worker,[twitter_app]},
 
+	Child_snoop = {twitter_mswitch_snoop,{twitter_mswitch_snoop, start_link,[]},
+	      permanent,2000,worker,[twitter_mswitch_snoop]},
 	
-	Children = [Child_logger, Child_switch, Child_clock, Child_app],
+	
+	
+	Children = [Child_logger, Child_switch, Child_clock, Child_app, Child_snoop ],
 	
     {ok,{{one_for_one,5,1}, Children }}.
 
