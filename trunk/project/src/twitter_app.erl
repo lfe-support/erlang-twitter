@@ -98,7 +98,7 @@ loop() ->
 			handle({hwswitch, From, Bus, Msg});
 	
 		Other ->
-			log(warning, "Unexpected message: ", [Other])
+			log(warning, "app: unexpected message: ", [Other])
 	end,
 	loop().
 

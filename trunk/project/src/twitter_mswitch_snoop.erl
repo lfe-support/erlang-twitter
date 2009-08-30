@@ -77,7 +77,7 @@
 %% Management Functions
 %%
 -export([
-		 start_link/0
+		 start_link/1
 		 ,stop/0
 		,loop/0
 		 ]).
@@ -110,7 +110,7 @@ defaults() ->
 %% ----------------------              ------------------------------
 %%%%%%%%%%%%%%%%%%%%%%%%%  Management  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% ----------------------              ------------------------------
-start_link() ->
+start_link(_Args) ->
 	Pid=spawn_link(?MODULE, loop, []),
 	register(?SERVER, Pid),
 	Pid ! start,
@@ -152,7 +152,7 @@ loop() ->
 			handle({hwswitch, From, Bus, Msg});
 	
 		Other ->
-			log(warning, "Unexpected message: ", [Other])
+			log(warning, "snoop: unexpected message: ", [Other])
 	end,
 	loop().
 
@@ -232,7 +232,3 @@ get_state() ->
 
 	
 	
-
-%% ----------------------         ------------------------------
-%%%%%%%%%%%%%%%%%%%%%%%%%  TESTS  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% ----------------------         ------------------------------
