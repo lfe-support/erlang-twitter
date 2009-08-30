@@ -34,7 +34,7 @@
 %% Exported Functions
 %%
 -export([
-		 start_link/0
+		 start_link/1
 		,stop/0
 		 ]).
 
@@ -57,7 +57,7 @@
 %% ----------------------              ------------------------------
 %%%%%%%%%%%%%%%%%%%%%%%%%  Management  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% ----------------------              ------------------------------
-start_link()->
+start_link(_Args)->
 	Pid=spawn_link(?MODULE, loop, []),
 	register(?SERVER, Pid),
 	Pid ! start,
