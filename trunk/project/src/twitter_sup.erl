@@ -37,6 +37,10 @@ init(_Args) ->
 	%% HWSwitch Subscriptions
 	Switch_Subs = [{}, {}],
 	
+	%% Add all modules here
+	Modules = [twitter_logger, twitter_hwswitch, twitter_clock ],
+	
+	
 	
     Child_logger = {twitter_log,{twitter_log, start_link,[{logfilename, "/var/log/twitter.log"}]},
 	      permanent,2000,worker,[twitter_log]},
@@ -44,8 +48,14 @@ init(_Args) ->
     Child_switch = {twitter_hwswitch,{twitter_hwswitch, start_link,[Switch_Subs]},
 	      permanent,2000,worker,[twitter_hwswitch]},
 
+    Child_clock = {twitter_clock,{twitter_clock, start_link,[]},
+	      permanent,2000,worker,[twitter_clock]},
+
+	Child_app = {twitter_app,{twitter_app, start_link,[Modules]},
+	      permanent,2000,worker,[twitter_app]},
+
 	
-	Children = [Child_logger, Child_switch],
+	Children = [Child_logger, Child_switch, Child_clock, Child_app],
 	
     {ok,{{one_for_one,5,1}, Children }}.
 
