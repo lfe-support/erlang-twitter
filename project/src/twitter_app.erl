@@ -1,36 +1,26 @@
 %% Author: Jean-Lou Dupont
-%% Created: 2009-08-28
-%% Description: Configuration Agent
+%% Created: 2009-08-30
+%% Description: App module
 %%
-%% @doc 
-%% = Configuration Agent =
+%% = App Agent =
 %%
-%% This module listens to 'sys.reload' and reloads configuration information from file.
-%% Once the new configuration is parsed and validated, this module generates the
-%% message 'sys.config'.
-%%
-%% This module listens for 'clock.tick.min' and 'clock.tick.sync' messages
-%% and generates 'sys.config' upon reception.
-%%
-%% This module listens for 'sys.mod.config' message and sends to the Source of this
-%% message its configuration information. E.g. 
+%% This module's primary function is to correlate the modules configuration version
+%% with that advertised through the message 'sys.config'.
+%% Each module advertises its current configuration version and a configuration master
+%% (usually the module Config) sends out 'sys.config' message indicating the currently
+%% in-force configuration version.  When all modules advertise their compliance to
+%% the in-force configuration, this module generates:
 %% ```
-%%  {policer, sys, {mod.config, Version}}
-%% '''
-%% if the parameter 'Version' does not correspond to the latest configuration version,
-%% this module sends to the source (and this case 'policer') its configuration information
-%% using the message format:
-%% ```
-%%  {config, Configuration}
+%%  {app, sys, app.ready}
 %% '''
 %%
-%% == Duties ==
+%% =Duties=
 %% <ul>
-%%  <li>Listen for 'sys.reload'</li>
-%%  <li>Listen for 'sys.mod.config'</li>
-%%  <li>Listen for 'clock.tick.min'</li>
-%%  <li>Listen for 'clock.tick.sync'</li>
-%%  <li>Generate 'sys.config'</li>
+%%  <li>Listens for 'clock.tick.min'  and generates 'sys.app.modules'</li>
+%%  <li>Listens for 'clock.tick.sync' and generates 'sys.app.modules'</li>
+%%  <li>Listens for 'sys.mod.config'</li>
+%%  <li>Listens for 'sys.config.</li>
+%%  <li>Generates 'sys.app.ready'</li>
 %% </ul>
 %%
 %%
@@ -38,26 +28,25 @@
 %%  <li></li>
 %% </ul>
 
--module(twitter_config).
+-module(twitter_app).
 
--define(BUSSES, [sys, clock]).
+-define(SERVER, app).
 -define(SWITCH, twitter_hwswitch).
--define(SERVER, config).
+-define(BUSSES, [sys, clock]).
 
 %%
-%% Management Functions
+%% API Functions
 %%
 -export([
-		 start_link/0
-		 ,stop/0
-		,loop/0
-		 ]).
-
+		 start_link/1
+		,stop/0
+		]).
 
 %%
-%% API functions
+%% LOCAL Functions
 %%
 -export([
+		 loop/0
 		 ]).
 
 %%
@@ -68,13 +57,14 @@
 		 blacklist/0
 		 ]).
 
+
 %% ----------------------              ------------------------------
 %%%%%%%%%%%%%%%%%%%%%%%%%  Management  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% ----------------------              ------------------------------
-start_link() ->
+start_link(Modules) ->
 	Pid=spawn_link(?MODULE, loop, []),
 	register(?SERVER, Pid),
-	Pid ! start,
+	Pid ! {start, Modules},
 	{ok, Pid}.
 
 stop() ->
@@ -94,8 +84,8 @@ loop() ->
 	receive
 		
 		%%% MANAGEMENT RELATED %%%
-		start ->
-			ok;
+		{start, Modules} ->
+			put(modules, Modules);
 		
 		stop ->
 			exit(normal);
@@ -115,9 +105,20 @@ loop() ->
 %% ----------------------            ------------------------------
 
 
-%% Not much to do
-handle({hwswitch, _From, sys, reload}) ->
+%% A module advertises its configuration version
+handle({hwswitch, _From, sys, {mod.config, Version}}) ->
 	ok;
+
+%% The in-force configuration version is announced
+handle({hwswitch, _From, sys, {config, Version}}) ->
+	ok;
+
+handle({hwswitch, _From, clock, {tick.min, Count}}) ->
+	ok;
+
+handle({hwswitch, _From, clock, {tick.sync, Count}}) ->
+	ok;
+
 
 handle({hwswitch, _From, sys, reload}) ->
 	ok;
@@ -141,7 +142,6 @@ handle(Other) ->
 log(Severity, Msg, Params) ->
 	?SWITCH:publish(log, {?SERVER, {Severity, Msg, Params}}).
 
-
 %% ----------------------          ------------------------------
 %%%%%%%%%%%%%%%%%%%%%%%%%  CONFIG  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% ----------------------          ------------------------------
@@ -159,6 +159,4 @@ blacklist() ->
 %%
 defaults() ->
 	[].
-
-
 
