@@ -60,7 +60,7 @@
 %%
 -export([
 		 start_link/1
-		,publish/2
+		,publish/2, publish/3
 		]).
 
 
@@ -92,6 +92,20 @@ start_link(U) ->
 publish(Bus, Msg) ->
 	try
 		?SERVER ! {publish, self(), Bus, Msg},
+		ok
+	catch
+		_:_ ->
+			self() ! {hwswitch.bounce, Bus, Msg},
+			{error, hwswitch.unreachable}
+	end.
+
+
+%% @doc Publishes a Message on a Bus using
+%%      a specific 'From'. For more information, @see publish/2
+%%
+publish(From, Bus, Msg) when is_atom(From) or is_pid(From) ->
+	try
+		?SERVER ! {publish, From, Bus, Msg},
 		ok
 	catch
 		_:_ ->
