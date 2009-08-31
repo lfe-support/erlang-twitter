@@ -14,8 +14,8 @@
 %% @doc Loads & validates system configuration from file
 %%
 %%
-do_config() ->
-	Defaults=get_defaults(),
+do_config(Modules) ->
+	Defaults=get_defaults(Modules),
 	% load & process defaults
 	% load & process config
 	ok.
@@ -30,15 +30,22 @@ do_config() ->
 %%		- 
 %%
 %% @spec process_config() -> {ok, Mtime, ModuleConfig}
-process_config(Defaults, Blacklist) ->
+process_config(Modules, Defaults) ->
 	case load_config_file() of
 		{error, Reason} ->
 			% already logged
 			{error, Reason};
 		
 		{ok, Mtime, Config} ->
+			%% 1) check format
 			List=  process_config(Mtime, Config, []),
-			List2= filter_on_blacklist(List, Blacklist, [])
+			Blacklist=get_blacklist(Modules, []),
+			
+			%% 2) filter on blacklist
+			List2= filter_on_blacklist(List, Blacklist, []),
+			
+			%% 3) check presence of mandatory parameters
+			check_mandatory(List2, Defaults)
 			
 	end.
 
@@ -56,6 +63,7 @@ filter_one({Key, Value}) when is_atom(Key) -> {Key, Value};
 filter_one(Inv) -> ?LOG:log(error, "config: invalid entry in config file: ", [Inv]).
 
 
+
 filter_on_blacklist([], _Blacklist, Acc) -> Acc;
 
 filter_on_blacklist([Entry|Rest], Blacklist, Acc) ->
@@ -68,6 +76,33 @@ filter_on_blacklist([Entry|Rest], Blacklist, Acc) ->
 		false -> filter_on_blacklist(Rest, Blacklist, Acc++[Entry])
 	end.
 	
+
+check_mandatory(_, []) ->
+	finished;
+
+%% @doc Go through the Defaults list to verify
+%%		the presence of mandatory parameters
+%%
+check_mandatory(List, [Default|Defaults]) ->
+	Key=get_key(Default),
+	Level=get_level(Default),
+	
+	case Level of
+		mandatory ->
+			check_mandatory1(List, Key);
+		_ ->
+			ok
+	end,
+	check_mandatory(List, Defaults).
+	
+
+check_mandatory1(List, Key) ->
+	case find_key_in_config_list(List, Key) of
+		{} -> ?LOG:log(error, "config: missing mandatory parameter: ", [Key]);
+		_  -> ok
+	end.
+
+
 
 
 %% @doc Loads the config file and updates the local variables & config state. 
@@ -110,8 +145,9 @@ get_config_file_mtime() ->
 
 %% @doc Returns a validated list of defaults
 %%		
-%% @spec get_defaults() -> [ModuleDefaults]
+%% @spec get_defaults(Modules) -> [ModuleDefaults]
 %% where
+%%	Modules=list()
 %%	@type ModuleDefaults = {ModuleName, Defaults}
 %%	ModuleName = atom()
 %%	@type Defaults = [Entry]
@@ -121,8 +157,8 @@ get_config_file_mtime() ->
 %%	Type = atom()
 %%	Value = atom() | list() | integer() | float()
 %%
-get_defaults() ->
-	load_defaults([], []).
+get_defaults(Modules) ->
+	load_defaults(Modules, []).
 	
 
 
@@ -256,10 +292,22 @@ get_module_blacklist(Module) ->
 	try
 		erlang:apply(Module, blacklist, [])
 	catch
-		_:_ ->
-			[]
+		_:_ -> []
 	end.
 
+
+%% @doc Retrieves all the blacklisted parameters
+%%		from all modules
+%% @spec get_black(Modules, Acc) -> list()
+%%
+get_blacklist([], Acc) ->
+	Acc;
+
+get_blacklist([Module|Modules], Acc) ->
+	List=get_module_blacklist(Module),
+	get_blacklist(Modules, Acc++List).
+
+	
 
 
 %% ----------------------           ------------------------------
@@ -301,6 +349,14 @@ config_filename(Home) ->
 
 	
 
+%% @doc Finds a specific Key from the tuple list
+%%
+find_key_in_config_list(List, Key) ->
+	?TOOLS:kfind(Key, List).
+
+
+
+
 
 %% @doc Retrieves the 'min' value for Key in the Defaults
 %%
@@ -311,8 +367,8 @@ config_filename(Home) ->
 %%	TypedValue= {Type, Value}
 %%  Type= atom()
 %%	Value=atom() | list() | undefined | invalid
-get_min(Key) ->
-	get_special(".min", Key).
+get_min(List, Key) ->
+	get_special(List, ".min", Key).
 	
 
 %% @doc Retrieves the 'max' value for Key in the Defaults
@@ -324,30 +380,28 @@ get_min(Key) ->
 %%  Type= atom()
 %%	Value=atom() | list() | undefined
 %%
-get_max(Key) ->
-	get_special(".max", Key).
+get_max(List, Key) ->
+	get_special(List, ".max", Key).
 
 
 
 %% @doc Retrieves the TypedDefault for Key
 %%
 %%
-get_special(Pattern, Key) when is_atom(Pattern) ->
+get_special(List, Pattern, Key) when is_atom(Pattern) ->
 	Pat=erlang:atom_to_list(Pattern),
-	get_special(Pat, Key);
+	get_special(List, Pat, Key);
 
-get_special(Pattern, Key) when is_list(Pattern) ->
+get_special(List, Pattern, Key) when is_list(Pattern) ->
 	Var=erlang:atom_to_list(Key)++Pattern,
 	Vara=erlang:list_to_atom(Var),
-	TypedDefault=?TOOLS:kfind(Vara, ?DEFAULTS:defaults()),
+	TypedDefault=?TOOLS:kfind(Vara, List),
 	get_special(Pattern, Key, TypedDefault).
 
-
-get_special(_Pattern, _Key, {}) ->
+get_special(_List, _Pattern, _Key, {}) ->
 	undefined;
 	
-
-get_special(_Pattern, _Key, TypedDefaultValue) ->
+get_special(_List, _Pattern, _Key, TypedDefaultValue) ->
 	%%io:format("get_special: Key:<~p> typed: ~p~n",[Key, TypedDefaultValue]),	
 	TypedDefaultValue.
 
