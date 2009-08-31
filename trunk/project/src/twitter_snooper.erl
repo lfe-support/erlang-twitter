@@ -58,7 +58,7 @@
 %% None.
 
 
--module(twitter_mswitch_snoop).
+-module(twitter_snooper).
 
 -define(MSWITCH, mswitch).
 -define(SERVER, snooper).
@@ -79,8 +79,12 @@
 -export([
 		 start_link/1
 		 ,stop/0
-		,loop/0
+		 ,get_server/0
 		 ]).
+
+-export([
+		loop/0
+		]).
 
 %% MSWITCH RELATED
 -export([
@@ -110,6 +114,9 @@ defaults() ->
 %% ----------------------              ------------------------------
 %%%%%%%%%%%%%%%%%%%%%%%%%  Management  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% ----------------------              ------------------------------
+get_server() ->
+	?SERVER.
+
 start_link(_Args) ->
 	Pid=spawn_link(?MODULE, loop, []),
 	register(?SERVER, Pid),

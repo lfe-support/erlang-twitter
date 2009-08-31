@@ -28,7 +28,7 @@
 
 -module(twitter_app).
 
--define(SERVER, twitter_app).
+-define(SERVER, app).
 -define(SWITCH, twitter_hwswitch).
 -define(BUSSES, [sys, clock]).
 
@@ -38,6 +38,7 @@
 -export([
 		 start_link/1
 		,stop/0
+		,get_server/0
 		]).
 
 %%
@@ -60,6 +61,10 @@
 %% ----------------------              ------------------------------
 %%%%%%%%%%%%%%%%%%%%%%%%%  Management  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% ----------------------              ------------------------------
+get_server() ->
+	?SERVER.
+
+
 start_link(Modules) when is_list(Modules)->
 	Pid=spawn_link(?MODULE, loop, []),
 	register(?SERVER, Pid),
