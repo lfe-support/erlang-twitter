@@ -242,12 +242,12 @@ format_encoded_list(Liste) ->
 	"?"++Liste.
 
 
+%% @doc Searches through a tuple list for Key
+%%
+%% @spec kfind(Key, List) -> {} | {Key, Value}
+%%
+kfind(_Key, []) ->	{};
 
-kfind(_Key, []) ->
-	{};
-
-%% Searches through a list for a Key
-%% Returns {} if not found or {Key, Value} otherwise
 kfind(Key, List) ->
 	case erlang:is_builtin(lists, keyfind, 3) of
 		true  ->

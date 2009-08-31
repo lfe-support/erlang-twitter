@@ -11,19 +11,62 @@
 -define(TOOLS,    twitter_tools).
 
 
+%% @doc Loads & validates system configuration from file
+%%
+%%
+do_config() ->
+	Defaults=get_defaults(),
+	% load & process defaults
+	% load & process config
+	ok.
 
-load_config() ->
-	load_config_file().
 
 
-%% Mainly used for debugging
-%% @private
-load_config(Config) ->
-	%?CTOOLS:put_defaults(),
-	Result=extract_config(Config),
-	validate_config(Config),
-	put(config_state, Result),
-	Result.
+
+
+%% @doc Processes configuration from file
+%%		The following function loads configuration information from file:
+%%		- Read raw terms
+%%		- 
+%%
+%% @spec process_config() -> {ok, Mtime, ModuleConfig}
+process_config(Defaults, Blacklist) ->
+	case load_config_file() of
+		{error, Reason} ->
+			% already logged
+			{error, Reason};
+		
+		{ok, Mtime, Config} ->
+			List=  process_config(Mtime, Config, []),
+			List2= filter_on_blacklist(List, Blacklist, [])
+			
+	end.
+
+process_config(Mtime, [], Acc) ->
+	{config, Mtime, Acc};
+
+process_config(Mtime, Config, Acc) when is_list(Config) ->
+	[Entry|Rest] = Config,
+	Fentry = filter_one(Entry),
+	process_config(Mtime, Rest, Acc++[Fentry]).
+
+
+filter_one({}) -> {};
+filter_one({Key, Value}) when is_atom(Key) -> {Key, Value};
+filter_one(Inv) -> ?LOG:log(error, "config: invalid entry in config file: ", [Inv]).
+
+
+filter_on_blacklist([], _Blacklist, Acc) -> Acc;
+
+filter_on_blacklist([Entry|Rest], Blacklist, Acc) ->
+	Key=get_key(Entry),
+	Blacklisted=lists:member(Key, Blacklist),
+	case Blacklisted of
+		true  -> 
+			?LOG:log(warning, "config: blacklisted parameter: ", [Key]),
+			filter_on_blacklist(Rest, Blacklist, Acc);
+		false -> filter_on_blacklist(Rest, Blacklist, Acc++[Entry])
+	end.
 	
 
 
@@ -32,23 +75,18 @@ load_config(Config) ->
 %% The function loads all the Default configuration parameters first
 %% and updates/complements them with the parameters on file.
 %%
-%% @spec load_config() -> {error, Reason} | {ok, Config}
+%% @spec load_config() -> {error, Reason} | {ok, Mtime, Config}
 %%
 %% @private
 load_config_file() ->
 	case read_config() of
 		{error, Reason} ->
-			?LOG:log(error, "File error reading configuration file, reason: ", [Reason]),
-			put(config_state, {error, Reason}),
+			?LOG:log(error, "config: error reading configuration file, reason: ", [Reason]),
 			{error, Reason};
 		
 		{ok, Config} ->
-			%?CTOOLS:put_defaults(),
-			%Result=extract_config(Config),
-			%validate_config(Config),
-			%put(config_state, Result),
-			%Result
-			Config
+			Mtime=get_config_file_mtime(),
+			{ok, Mtime, Config}
 	end.
 
 
@@ -58,19 +96,36 @@ get_config_file_mtime() ->
 	case file:read_file_info(Filename) of
 		{ok, FileInfo} ->
 			FileInfo#file_info.mtime;
-		_ ->
-			error
+		{error, Reason} ->
+			?LOG:log(error, "config: error getting info from file, {Filename, Reason}", [Filename, Reason]),
+			unknown
 	end.
 
 
 
 
-%% ----------------------         ------------------------------
-%%%%%%%%%%%%%%%%%%%%%%%%%  LOCAL  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% ----------------------         ------------------------------
+%% ----------------------            ------------------------------
+%%%%%%%%%%%%%%%%%%%%%%%%%  DEFAULTS  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% ----------------------            ------------------------------
+
+%% @doc Returns a validated list of defaults
+%%		
+%% @spec get_defaults() -> [ModuleDefaults]
+%% where
+%%	@type ModuleDefaults = {ModuleName, Defaults}
+%%	ModuleName = atom()
+%%	@type Defaults = [Entry]
+%%	@type Entry={Key, Level, Type, Value}            %% <--------
+%%	Key = atom()
+%%	Level = atom()
+%%	Type = atom()
+%%	Value = atom() | list() | integer() | float()
+%%
 get_defaults() ->
 	load_defaults([], []).
 	
+
+
 load_defaults([], Acc) ->
 	Acc;
 
@@ -110,7 +165,7 @@ try_check_defaults(Defaults, List) when is_list(Defaults) ->
 	Entry= check1_one_default(Default),
 	E1= check2_one_default(Entry),
 	E2= check3_one_default(E1),
-	try_check_defaults(Defaults, List++[E2]).
+	try_check_defaults(Rest, List++[E2]).
 
 
 check1_one_default({}) ->
@@ -169,20 +224,41 @@ check3_one_default({Key, Level, Type, Value}) when Type==atom ->
 
 
 
-filter_entries([], Acc) ->
-	Acc;
-
-filter_entries([{}|Rest], Acc) ->
-	filter_entries(Rest, Acc);
-	
-filter_entries([Entry|Rest], Acc) ->
-	filter_entries(Rest, Acc++[Entry]).
-
-	
+filter_entries([], Acc)           -> Acc;
+filter_entries([{}|Rest], Acc)    -> filter_entries(Rest, Acc);
+filter_entries([Entry|Rest], Acc) -> filter_entries(Rest, Acc++[Entry]).
 
 
 
+get_key({Key, _Level, _Type, _Value}) -> {key, Key};
+get_key(_) -> error.
 
+get_level({_Key, Level, _Type, _Value}) -> {level, Level};
+get_level(_) ->	error.
+
+get_type({_Key, _Level, Type, _Value}) -> {type, Type};
+get_type(_) -> error.
+
+get_value({_Key, _Level, _Type, Value}) -> {value, Value};
+get_value(_) -> error.
+
+
+
+%% @doc Retrieves a module's defaults
+%%
+get_module_defaults(Entries, Module) ->
+	?TOOLS:kfind(Entries, Module).
+
+
+
+%% @doc Retrieves a module's blacklist entries
+get_module_blacklist(Module) ->
+	try
+		erlang:apply(Module, blacklist, [])
+	catch
+		_:_ ->
+			[]
+	end.
 
 
 
