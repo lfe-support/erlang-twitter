@@ -35,7 +35,7 @@
 
 %% Keep this registered name in order for
 %% other processes to easily interface to it.
--define(SERVER, logger).
+-define(SERVER, log).
 
 %% Log unique identifier
 -define(DEFAULT_LOG,  loggerid).
@@ -57,9 +57,9 @@
 %% API Exported Functions
 %%
 -export([
-		 start_link/0, start_link/1,
-		 
-		 log/1, log/2
+		 start_link/0, start_link/1
+		 ,get_server/0
+		 ,log/1, log/2
 		 ]).
 
 %% LOCALS
@@ -70,6 +70,9 @@
 %% ----------------------      ------------------------------
 %%%%%%%%%%%%%%%%%%%%%%%%%  API %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% ----------------------      ------------------------------
+get_server() ->
+	?SERVER.
+
 
 %% @doc Default start
 %%		Should be avoided because of probably unhelpful

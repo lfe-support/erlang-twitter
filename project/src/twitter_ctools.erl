@@ -16,9 +16,9 @@
 %%
 do_config(Modules) ->
 	Defaults=get_defaults(Modules),
-	% load & process defaults
-	% load & process config
-	ok.
+	Config=process_config(Modules, Defaults),
+	merge(Defaults, Config).
+
 
 
 
@@ -29,7 +29,8 @@ do_config(Modules) ->
 %%		- Read raw terms
 %%		- 
 %%
-%% @spec process_config() -> {ok, Mtime, ModuleConfig}
+%% @spec process_config() -> {error, Reason} | {ok, Mtime, ModuleConfig}
+%%
 process_config(Modules, Defaults) ->
 	case load_config_file() of
 		{error, Reason} ->
@@ -55,6 +56,7 @@ process_config(Modules, Defaults) ->
 			%% 5) check limit requirements
 			List5=check_limits(List4, Defaults, []),
 	
+			%% Remove unnecessary entries such as {}
 			List6=filter_entries(List5, []),
 			
 			{ok, Mtime, List6}			
@@ -596,3 +598,27 @@ check_pattern(Pattern, Key) ->
 	end.
 
 
+%% @doc Retrieves the Server associated with Module
+%%
+%% @spec get_module_server(Module) -> undefined | atom()
+%%
+get_module_server(Module) ->
+	try
+		erlang:apply(Module, get_server, [])
+	catch
+		_:_ -> undefined
+	end.
+
+
+
+%% @doc Merge the parameters from the Defaults
+%%		with ones from the configuration file
+%%
+%%		It is assumed that the 'Config' list has
+%%		been validated.
+%%
+merge(Defaults, Config) ->
+	ok.
+	
+	
+	
