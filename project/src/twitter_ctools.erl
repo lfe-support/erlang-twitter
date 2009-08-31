@@ -597,6 +597,8 @@ check_pattern(Pattern, Key) ->
 		_ -> true
 	end.
 
+	
+
 
 %% @doc Retrieves the Server associated with Module
 %%
@@ -617,8 +619,43 @@ get_module_server(Module) ->
 %%		It is assumed that the 'Config' list has
 %%		been validated.
 %%
+%%		Config   =[{ModuleName, [{ParamName, Value}]} ]
+%%		Defaults =[{ModuleName.ParamName, Level, Type, Value}]
+%%
+%%		Result= [{ModuleName.Param, Value}]
+%%
+%% @spec merge(Defaults, Config) -> [tuple()]
+%%
 merge(Defaults, Config) ->
-	ok.
+	do_merge(Config, Defaults).
+
+
+do_merge([], Acc) ->
+	Acc;
+
+do_merge([ModuleEntries|Rest], Acc) ->
+	try
+		{ModuleName, RawEntries}=ModuleEntries,
+		Entries=do_merge_module_entries(ModuleName, RawEntries, []),
+		do_merge(Rest, Acc++Entries)
+	catch
+		_:_ ->
+			?LOG:log(error, "config: error whilst merging defaults+config")
+	end.
+	
+
+
+do_merge_module_entries(_ModuleName, [], Acc) ->
+	Acc;
+	
+do_merge_module_entries(ModuleName, [ModuleEntry|Rest], Acc) ->
+	{ParamName, Value}=ModuleEntry,
+	Atom=?TOOLS:make_atom_from_list([ModuleName, '.', ParamName]),
+	do_merge_module_entries(ModuleName, Rest, Acc++[{Atom, Value}]).
+
+
+
+
 	
 	
 	
