@@ -655,7 +655,38 @@ do_merge_module_entries(ModuleName, [ModuleEntry|Rest], Acc) ->
 
 
 
+is_for_module(ModuleName, Key) ->
+	HeadKey=?TOOLS:extract_head(Key),
+	is_for_module2(ModuleName, HeadKey).
 
+is_for_module2(X, X) -> true;
+is_for_module2(_, _) -> false.
+
+
+
+get_module_entries(ModuleName, Config) ->
+	get_module_entries(ModuleName, Config, []).
+
+
+get_module_entries(_ModuleName, [], Acc) -> Acc;
+get_module_entries(ModuleName, [Entry|Rest], Acc) ->
+	{ParamName, Value}=Entry,
+	case is_for_module(ModuleName, ParamName) of
+		true  -> get_module_entries(ModuleName, Rest, Acc++[{ParamName, Value}]);
+		false -> get_module_entries(ModuleName, Rest, Acc)
+	end.
 	
 	
+
+
+
+split_by_module(Config) ->
+	split_by_module(Config, []).
+
+split_by_module([], Acc) -> Acc;
+
+split_by_module([Entry|Rest], Acc) ->
+	{ParamName, Value} = Entry.
+
+
 	
