@@ -7,7 +7,8 @@
 %%
 %% This module listens to 'sys.reload' and reloads configuration information from file.
 %% Once the new configuration is parsed and validated, this module generates the
-%% message 'sys.config'.
+%% message 'sys.config' advertising the in-force Version# of the configuration 
+%% for the application.
 %%
 %% This module listens for 'clock.tick.min' and 'clock.tick.sync' messages
 %% and generates 'sys.config' upon reception.
@@ -48,7 +49,7 @@
 %% Management Functions
 %%
 -export([
-		 start_link/0
+		 start_link/1
 		 ,stop/0
 		,loop/0
 		 ]).
@@ -71,7 +72,7 @@
 %% ----------------------              ------------------------------
 %%%%%%%%%%%%%%%%%%%%%%%%%  Management  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% ----------------------              ------------------------------
-start_link() ->
+start_link(_Args) ->
 	Pid=spawn_link(?MODULE, loop, []),
 	register(?SERVER, Pid),
 	Pid ! start,
@@ -124,6 +125,13 @@ handle({hwswitch, _From, sys, reload}) ->
 
 handle(Other) ->
 	log(warning, "Unexpected message: ", [Other]).
+
+
+
+%% ----------------------         ------------------------------
+%%%%%%%%%%%%%%%%%%%%%%%%%  DOERS  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% ----------------------         ------------------------------
+
 
 
 
