@@ -55,6 +55,7 @@
 		 make_atom_from_list/1,  make_atom_from_list/2
 		 ,vsize/1
 		 ,is_alive/1, is_alive/2
+		 ,extract_head/1, extract_head/2, extract_head2/1
 		 ]).
 
 %%
@@ -451,3 +452,26 @@ is_alive(_Name, Pid) when is_pid(Pid) ->
 
 is_alive(_,_) ->
 	false.
+
+
+
+extract_head(Atom) ->
+	extract_head(Atom, ".").
+
+%% @doc Extracts the 'head' of the atom
+%%		
+%% @spec extract_head(Atom, SeparatorList) -> atom()
+%%
+extract_head(Atom, SeparatorList) when is_atom(Atom) ->
+	String=erlang:atom_to_list(Atom),
+	Tokens=string:tokens(String, SeparatorList),
+	extract_head2(Tokens).
+
+extract_head2([]) ->
+	'';
+
+extract_head2([Head|_Rest]) ->
+	erlang:list_to_atom(Head).
+	
+	
+	
