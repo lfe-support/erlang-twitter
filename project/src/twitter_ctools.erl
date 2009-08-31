@@ -44,8 +44,10 @@ process_config(Modules, Defaults) ->
 			%% 2) filter on blacklist
 			List2= filter_on_blacklist(List, Blacklist, []),
 			
+			List3= filter_on_patterns(['.min', '.max'], List2, []),
+			
 			%% 3) check presence of mandatory parameters
-			check_mandatory(List2, Defaults),
+			check_mandatory(List3, Defaults),
 			
 			%% 4) type check
 			List4=check_type(List2, Defaults, []),
@@ -85,6 +87,18 @@ filter_on_blacklist([Entry|Rest], Blacklist, Acc) ->
 		false -> filter_on_blacklist(Rest, Blacklist, Acc++[Entry])
 	end.
 	
+
+
+filter_on_patterns(_Patterns, [], Acc) -> Acc;
+
+filter_on_patterns(Patterns, [{Key, Value}|Rest], Acc) ->
+	case has_pattern(Patterns, Key) of
+		true  -> Item={};
+		false -> Item={Key, Value}
+	end,
+	filter_on_patterns(Patterns, Rest, Acc++[Item]).
+
+
 
 check_mandatory(_, []) ->
 	finished;
@@ -193,12 +207,21 @@ check_limit_one2({Key, Value}, {}, {}) ->
 	{Key, Value};
 
 check_limit_one2({Key, Value}, Result, {}) ->
+	Limit=get_value(Result),
 	?LOG:log(debug, "config: missing 'max' default for key: ", [Key]),
-	check_limit(min, {Key, Value}, Result);
+	check_limit(min, {Key, Value}, Limit);
 
 check_limit_one2({Key, Value}, {}, Result) ->
+	Limit=get_value(Result),
 	?LOG:log(debug, "config: missing 'min' default for key: ", [Key]),
-	check_limit(max, {Key, Value}, Result).
+	check_limit(max, {Key, Value}, Limit);
+
+
+check_limit_one2({Key, Value}, MinResult, MaxResult) ->
+	MinV=get_value(MinResult),
+	MaxV=get_value(MaxResult),
+	{K1, V1}=check_limit(min, {Key, Value}, MinV),
+	check_limit(max, {K1, V1}, MaxV).
 
 
 
@@ -206,7 +229,8 @@ check_limit_one2({Key, Value}, {}, Result) ->
 check_limit(max, {Key, Value}, Limit) when (is_integer(Value) or is_float(Value)) 
   											and (is_integer(Limit) or is_float(Limit)) ->
 	case Value > Limit of
-		true ->	?LOG:log(error, "config: value 'too big' for key: ", [Key]), {};
+		true ->	?LOG:log(error, "config: value 'too big' for key: ", [Key]), 
+				{Key, Limit};
 		false->	{Key, Value}
 	end;
 
@@ -214,79 +238,13 @@ check_limit(max, {Key, Value}, Limit) when (is_integer(Value) or is_float(Value)
 check_limit(min, {Key, Value}, Limit) when (is_integer(Value) or is_float(Value)) 
   											and (is_integer(Limit) or is_float(Limit)) ->
 	case Value < Limit of
-		true ->	?LOG:log(error, "config: value 'too low' for key: ", [Key]), {};
+		true ->	?LOG:log(error, "config: value 'too low' for key: ", [Key]), 
+				{Key, Limit};
 		false->	{Key, Value}
 	end;
 
 check_limit(_, {Key, _Value}, Limit) ->
 	?LOG:log(error, "config: invalid default value for {Key, DefaultValue}: ", [Key, Limit]).
-
-
-
-
-			
-	
-
-
-
-
-%% @doc Validates a limit
-%%
-%% @spec validate_limit(Value, Min, Max) -> invalid | too_low | too_high | ok
-%%
-validate_limit(_Value, undefined, undefined) ->
-	ok;
-
-%% Just lower limit
-validate_limit(Value, Min, undefined) ->
-	cmp(min, Value, Min);
-
-%% Just upper limit
-validate_limit(Value, undefined, Max) ->
-	cmp(max, Value, Max);
-
-%% Both limits
-validate_limit(Value, Min, Max) when is_integer(Min), is_integer(Max) ->
-	R1=cmp(min, Value, Min),
-	R2=cmp(max, Value, Max),
-	resolve_cmp(R1, R2);
-
-%% CATCH-ALL
-validate_limit(V, Min, Max) ->
-	?LOG:log(critical, "Internal error in 'validate_limit': {V, Min, Max}", [V, Min, Max]),
-	ok.
-
-
-resolve_cmp(ok, ok) ->	ok;
-resolve_cmp(ok, R2) ->	R2;
-resolve_cmp(R1, ok) ->	R1.
-
-
-
-cmp(min, Value, Target) when is_integer(Value), is_integer(Target) ->
-	case Value > Target of
-		false -> too_low;
-		_     -> ok
-	end;
-
-cmp(max, Value, Target) when is_integer(Value), is_integer(Target) ->
-	case Value > Target of
-		false -> ok;
-		_     -> too_high
-	end;
-
-cmp(_, _, _) ->
-	invalid.
-
-
-
-
-
-
-
-
-
-
 
 
 
