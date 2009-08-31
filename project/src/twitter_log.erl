@@ -31,7 +31,7 @@
 %%  </ul>
 
 -module(twitter_log).
--compile({nowarn_unused_function, [loop, handle]}).
+%-compile({nowarn_unused_function, [loop, handle]}).
 
 %% Keep this registered name in order for
 %% other processes to easily interface to it.
@@ -62,6 +62,10 @@
 		 log/1, log/2
 		 ]).
 
+%% LOCALS
+-export([
+		 loop/0
+		 ]).
 
 %% ----------------------      ------------------------------
 %%%%%%%%%%%%%%%%%%%%%%%%%  API %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -83,13 +87,15 @@ start_link() ->
 %% where
 %%	LogName = string()  %% absolute filename path
 %%
-start_link([{logfilename, LogName}]) when length(LogName)>0 ->
+start_link({logfilename, LogName}) when length(LogName)>0 ->
 	run(?SERVER, LogName);
 
-start_link([{logfilename, LogName}]) when length(LogName)==0 ->
+start_link({logfilename, LogName}) when length(LogName)==0 ->
+	io:format("logger: invalid log filename: ~p~n", [LogName]),
 	{error, logfilename};
 
 start_link(Other) ->
+	io:format("logger: invalid parameter: ~p~n", [Other]),
 	{error, {invalid_parameter, Other}}.
 
 
@@ -97,7 +103,7 @@ start_link(Other) ->
 run(Server, LogName) ->
 	Pid=spawn_link(?MODULE, loop, []),
 	register(Server, Pid),
-	Server ! {start, LogName},
+	Pid ! {start, LogName},
 	{ok, Pid}.
 
 

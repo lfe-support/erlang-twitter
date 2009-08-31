@@ -139,6 +139,9 @@ loop(Subs) ->
 %%%%%%%%%%%%%%%%%%%%%%%%% PUBLISH %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% ----------------------         ------------------------------
 
+hpublish([], _From, _Bus, _Msg) ->
+	no_subscribers;
+
 hpublish(Subs, From, Bus, Msg) ->
 	%io:format("hpublish: bus[~p] subs[~p] ~n",[Bus, Subs]),
 	try

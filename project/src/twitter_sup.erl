@@ -35,10 +35,10 @@ start_link(Args) ->
 init(_Args) ->
 	
 	%% HWSwitch Subscriptions
-	Switch_Subs = [{}, {}],
+	Switch_Subs = [{clock, [sys]}, {logger, [sys, clock, log]}],
 	
 	%% Add all modules here
-	Modules = [twitter_logger, twitter_hwswitch, twitter_clock ],
+	Modules = [twitter_logger, twitter_hwswitch, twitter_clock, twitter_config ],
 	
 	
 	
@@ -57,9 +57,13 @@ init(_Args) ->
 	Child_snoop = {twitter_mswitch_snoop,{twitter_mswitch_snoop, start_link,[]},
 	      permanent,2000,worker,[twitter_mswitch_snoop]},
 	
+	Child_config = {twitter_config,{twitter_config, start_link,[]},
+	      permanent,2000,worker,[twitter_mswitch_config]},
 	
 	
-	Children = [Child_logger, Child_switch, Child_clock, Child_app, Child_snoop ],
+	%Children = [Child_logger, Child_switch, Child_clock, Child_app, Child_snoop, Child_config   ],
+	Children = [Child_switch, Child_clock, Child_logger],
+	
 	
     {ok,{{one_for_one,5,1}, Children }}.
 
