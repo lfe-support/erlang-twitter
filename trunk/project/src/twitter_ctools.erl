@@ -45,8 +45,17 @@ process_config(Modules, Defaults) ->
 			List2= filter_on_blacklist(List, Blacklist, []),
 			
 			%% 3) check presence of mandatory parameters
-			check_mandatory(List2, Defaults)
+			check_mandatory(List2, Defaults),
 			
+			%% 4) type check
+			List4=check_type(List2, Defaults, []),
+			
+			%% 5) check limit requirements
+			List5=check_limits(List4, Defaults, []),
+	
+			List6=filter_entries(List5, []),
+			
+			{ok, Mtime, List6}			
 	end.
 
 process_config(Mtime, [], Acc) ->
@@ -101,6 +110,185 @@ check_mandatory1(List, Key) ->
 		{} -> ?LOG:log(error, "config: missing mandatory parameter: ", [Key]);
 		_  -> ok
 	end.
+
+
+check_type([], _Defaults, Acc) -> Acc;
+
+%% @doc Go through the parameters list
+%%		and check each entry type against
+%%		the entries in defaults. Filter out
+%%		each entry in type mismatch error.
+%%
+%% @spec check_type(Parameters, Defaults, Acc) -> list()
+%%
+check_type([ConfigEntry|Rest], Defaults, Acc) ->
+	Entry=check_type_one(ConfigEntry, Defaults),
+	check_type(Rest, Defaults, Acc++[Entry]).
+
+
+check_type_one(ConfigEntry, Defaults) ->
+	{Key, _Value}=ConfigEntry,
+	Dentry=get_entry_from_defaults(Defaults, Key),
+	case check_type2(Key, ConfigEntry, Dentry) of
+		ok -> ConfigEntry;
+		_ ->  
+			case Dentry of
+				no_default -> {};
+				_          -> Dentry
+			end
+	end.
+
+
+%% @doc Filters a configuration parameter
+%%
+check_type2(Key, _ConfigEntry, {}) ->
+	?LOG:log(debug, "config: missing default entry for key: ", [Key]),
+	
+	%% delete entry from list of valid entries
+	no_default;
+
+check_type2(Key, {Ckey, Cvalue}, DefaultEntry) ->
+	TargetType=get_type(DefaultEntry),
+	DefaultValue=get_value(DefaultEntry),
+	check_type3(Key, Ckey, TargetType, Cvalue, DefaultValue).
+
+check_type3(_Key, _Ckey, atom,   Cvalue, _Dvalue) when is_atom(Cvalue)    -> ok;
+check_type3(_Key, _Ckey, string, Cvalue, _Dvalue) when is_list(Cvalue)    -> ok;
+check_type3(_Key, _Ckey, int,    Cvalue, _Dvalue) when is_integer(Cvalue) -> ok;
+check_type3(_Key, _Ckey, float,  Cvalue, _Dvalue) when is_float(Cvalue)   -> ok;
+check_type3(Key,  _Ckey, nstring,Cvalue, _Dvalue) when is_list(Cvalue) -> 
+	case length(Cvalue) of
+		0 -> ?LOG:log(error, "config: expecting non-zero string for key: ", [Key]),	invalid;
+		_ -> ok
+	end.
+
+		
+
+
+check_limits([], _Defaults, Acc) ->
+	Acc;
+
+check_limits([ConfigEntry|Entries], Defaults, []) ->
+	Entry=check_limit_one(ConfigEntry, Defaults),
+	check_limits(Entries, Defaults, Defaults++[Entry]).
+
+
+
+check_limit_one({Key, Value}, Defaults) ->
+	case has_pattern(['.min', '.max'], Key) of
+		true  -> {Key, Value};
+		false ->
+			MinResult=get_min(Defaults, Key),
+			MaxResult=get_max(Defaults, Key),
+			check_limit_one2({Key, Value}, MinResult, MaxResult)
+	end;
+
+%% shouldn't get here...
+check_limit_one(_, _Defaults) ->
+	ok.
+
+check_limit_one2({Key, Value}, {}, {}) ->
+	?LOG:log(debug, "config: missing 'min' default for key: ", [Key]), 
+	?LOG:log(debug, "config: missing 'max' default for key: ", [Key]),
+	{Key, Value};
+
+check_limit_one2({Key, Value}, Result, {}) ->
+	?LOG:log(debug, "config: missing 'max' default for key: ", [Key]),
+	check_limit(min, {Key, Value}, Result);
+
+check_limit_one2({Key, Value}, {}, Result) ->
+	?LOG:log(debug, "config: missing 'min' default for key: ", [Key]),
+	check_limit(max, {Key, Value}, Result).
+
+
+
+
+check_limit(max, {Key, Value}, Limit) when (is_integer(Value) or is_float(Value)) 
+  											and (is_integer(Limit) or is_float(Limit)) ->
+	case Value > Limit of
+		true ->	?LOG:log(error, "config: value 'too big' for key: ", [Key]), {};
+		false->	{Key, Value}
+	end;
+
+
+check_limit(min, {Key, Value}, Limit) when (is_integer(Value) or is_float(Value)) 
+  											and (is_integer(Limit) or is_float(Limit)) ->
+	case Value < Limit of
+		true ->	?LOG:log(error, "config: value 'too low' for key: ", [Key]), {};
+		false->	{Key, Value}
+	end;
+
+check_limit(_, {Key, _Value}, Limit) ->
+	?LOG:log(error, "config: invalid default value for {Key, DefaultValue}: ", [Key, Limit]).
+
+
+
+
+			
+	
+
+
+
+
+%% @doc Validates a limit
+%%
+%% @spec validate_limit(Value, Min, Max) -> invalid | too_low | too_high | ok
+%%
+validate_limit(_Value, undefined, undefined) ->
+	ok;
+
+%% Just lower limit
+validate_limit(Value, Min, undefined) ->
+	cmp(min, Value, Min);
+
+%% Just upper limit
+validate_limit(Value, undefined, Max) ->
+	cmp(max, Value, Max);
+
+%% Both limits
+validate_limit(Value, Min, Max) when is_integer(Min), is_integer(Max) ->
+	R1=cmp(min, Value, Min),
+	R2=cmp(max, Value, Max),
+	resolve_cmp(R1, R2);
+
+%% CATCH-ALL
+validate_limit(V, Min, Max) ->
+	?LOG:log(critical, "Internal error in 'validate_limit': {V, Min, Max}", [V, Min, Max]),
+	ok.
+
+
+resolve_cmp(ok, ok) ->	ok;
+resolve_cmp(ok, R2) ->	R2;
+resolve_cmp(R1, ok) ->	R1.
+
+
+
+cmp(min, Value, Target) when is_integer(Value), is_integer(Target) ->
+	case Value > Target of
+		false -> too_low;
+		_     -> ok
+	end;
+
+cmp(max, Value, Target) when is_integer(Value), is_integer(Target) ->
+	case Value > Target of
+		false -> ok;
+		_     -> too_high
+	end;
+
+cmp(_, _, _) ->
+	invalid.
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -265,7 +453,12 @@ filter_entries([{}|Rest], Acc)    -> filter_entries(Rest, Acc);
 filter_entries([Entry|Rest], Acc) -> filter_entries(Rest, Acc++[Entry]).
 
 
-
+%% @doc Retrieves the Key field from an Entry (defaults format)
+%% 
+%% @spec get_key(Entry) -> Key
+%% where 
+%%	Entry = {Key, Level, Type, Value}
+%%	Key = atom()
 get_key({Key, _Level, _Type, _Value}) -> {key, Key};
 get_key(_) -> error.
 
@@ -280,10 +473,31 @@ get_value(_) -> error.
 
 
 
+
+get_entry_from_defaults([], _Key) -> {};
+
+%% @doc Retrieves an Entry from Key in the Defaults list
+%%
+%% @spec get_entry_from_defaults(Defaults, Key) -> Entry
+%%
+get_entry_from_defaults([ModuleEntries|Modules], Key) ->
+	Entry=?TOOLS:kfind(Key, ModuleEntries),
+	case Entry of
+		{} ->
+			get_entry_from_defaults(Modules, Key);
+		Entry ->
+			Entry
+	end.
+
+	
+
+
 %% @doc Retrieves a module's defaults
 %%
+%% @spec get_module_defaults(Entries, Module) -> list()
+%%
 get_module_defaults(Entries, Module) ->
-	?TOOLS:kfind(Entries, Module).
+	?TOOLS:kfind(Module, Entries).
 
 
 
@@ -360,34 +574,32 @@ find_key_in_config_list(List, Key) ->
 
 %% @doc Retrieves the 'min' value for Key in the Defaults
 %%
-%% @spec get_min(Key) -> TypedValue
+%% @spec get_min(Key) -> tuple() | {}
 %% where
 %%	Key=atom()
-%%	Value=atom() | list() | undefined
-%%	TypedValue= {Type, Value}
-%%  Type= atom()
-%%	Value=atom() | list() | undefined | invalid
 get_min(List, Key) ->
 	get_special(List, ".min", Key).
 	
 
 %% @doc Retrieves the 'max' value for Key in the Defaults
 %%
-%% @spec get_max(Key) -> TypedValue
+%% @spec get_max(Key) -> tuple() | {}
 %% where
 %%	Key=atom()
-%%	TypedValue= {Type, Value}
-%%  Type= atom()
-%%	Value=atom() | list() | undefined
+
 %%
 get_max(List, Key) ->
 	get_special(List, ".max", Key).
 
 
 
-%% @doc Retrieves the TypedDefault for Key
+%% @doc Retrieves the complete tuple matching Key
 %%
-%%
+%% @spec get_special(List, Pattern, Key) -> tuple() | {}
+%% where
+%%	List=[tuple()]
+%%	Pattern=atom()
+%%	Key=atom()
 get_special(List, Pattern, Key) when is_atom(Pattern) ->
 	Pat=erlang:atom_to_list(Pattern),
 	get_special(List, Pat, Key);
@@ -395,15 +607,7 @@ get_special(List, Pattern, Key) when is_atom(Pattern) ->
 get_special(List, Pattern, Key) when is_list(Pattern) ->
 	Var=erlang:atom_to_list(Key)++Pattern,
 	Vara=erlang:list_to_atom(Var),
-	TypedDefault=?TOOLS:kfind(Vara, List),
-	get_special(Pattern, Key, TypedDefault).
-
-get_special(_List, _Pattern, _Key, {}) ->
-	undefined;
-	
-get_special(_List, _Pattern, _Key, TypedDefaultValue) ->
-	%%io:format("get_special: Key:<~p> typed: ~p~n",[Key, TypedDefaultValue]),	
-	TypedDefaultValue.
+	?TOOLS:kfind(Vara, List).
 
 
 
