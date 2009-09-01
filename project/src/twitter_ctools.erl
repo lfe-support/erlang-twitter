@@ -16,13 +16,13 @@
 %%
 do_config(Modules) ->
 	Defaults=get_defaults(Modules),
-	io:format("Defaults: ~p~n", [Defaults]),	
+	%io:format("Defaults: ~p~n", [Defaults]),	
 	Result=process_config(Modules, Defaults),
 	case Result of
 		{ok, Mtime, Config} ->
-			io:format("Config: ~p~n", [Config]),
+			%io:format("Config: ~p~n", [Config]),
 			Merged=merge(Defaults, Config),
-			io:format("Merged: ~p~n", [Merged]);		
+			{ok, Mtime, Merged};
 		Other ->
 			Other
 	end.
@@ -47,7 +47,7 @@ process_config(Modules, Defaults) ->
 		
 		{ok, Mtime, Config} ->
 			
-			io:format("Config file content: ~p~n", [Config]),
+			%io:format("Config file content: ~p~n", [Config]),
 			
 			%% 1) check format
 			List=  do_process_config(Config, []),
@@ -56,7 +56,7 @@ process_config(Modules, Defaults) ->
 			%% 2) filter on blacklist
 			List2= filter_on_blacklist(List, Blacklist, []),
 			
-			io:format("After blacklist: ~p~n", [List2]),
+			%io:format("After blacklist: ~p~n", [List2]),
 			
 			List3= filter_on_patterns(['.min', '.max'], List2, []),
 			
@@ -338,7 +338,7 @@ load_defaults([], Acc) ->
 %%
 load_defaults([Module|Modules], Acc) ->
 	Defaults=try_load_module_defaults(Module),
-	io:format("load_defaults: Module[~p] Defaults[~p]~n",[Module, Defaults]),	
+	%io:format("load_defaults: Module[~p] Defaults[~p]~n",[Module, Defaults]),	
 	List=try_check_defaults(Defaults, []),
 	FilteredList=filter_entries(List, []),
 	load_defaults(Modules, Acc++[{Module, FilteredList}]).
@@ -646,8 +646,8 @@ get_module_server(Module) ->
 %% @spec merge(Defaults, Config) -> [tuple()]
 %%
 merge(Defaults, Config) ->
-	io:format("merge: defaults<~p>~n", [Defaults]),
-	io:format("merge: config<~p>~n", [Config]),
+	%io:format("merge: defaults<~p>~n", [Defaults]),
+	%io:format("merge: config<~p>~n", [Config]),
 	
 	% start with all the Defaults in list
 	do_merge(Config, Defaults).
@@ -659,7 +659,9 @@ do_merge([], Acc) ->
 do_merge([ConfigEntry|ConfigEntries], Acc) ->
 	try
 		{ParamName, Value}=ConfigEntry,
+		%io:format("do_merge: param[~p] value[~p]~n",[ParamName, Value]),
 		ModuleName=extract_module_name(ParamName),
+		%io:format("do_merge: moduleName[~p]~n",[ModuleName]),
 		NewList=insert_entry(ModuleName, ParamName, Value, Acc),
 		do_merge(ConfigEntries, NewList)
 	catch
