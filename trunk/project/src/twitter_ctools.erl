@@ -39,7 +39,7 @@ process_config(Modules, Defaults) ->
 		
 		{ok, Mtime, Config} ->
 			%% 1) check format
-			List=  process_config(Mtime, Config, []),
+			List=  do_process_config(Config, []),
 			Blacklist=get_blacklist(Modules, []),
 			
 			%% 2) filter on blacklist
@@ -62,13 +62,13 @@ process_config(Modules, Defaults) ->
 			{ok, Mtime, List6}			
 	end.
 
-process_config(Mtime, [], Acc) ->
-	{config, Mtime, Acc};
+do_process_config([], Acc) ->
+	Acc;
 
-process_config(Mtime, Config, Acc) when is_list(Config) ->
+do_process_config(Config, Acc) when is_list(Config) ->
 	[Entry|Rest] = Config,
 	Fentry = filter_one(Entry),
-	process_config(Mtime, Rest, Acc++[Fentry]).
+	process_config(Rest, Acc++[Fentry]).
 
 
 filter_one({}) -> {};
@@ -323,6 +323,7 @@ load_defaults([], Acc) ->
 %%
 load_defaults([Module|Modules], Acc) ->
 	Defaults=try_load_module_defaults(Module),
+	io:format("load_defaults: Module[~p] Defaults[~p]~n",[Module, Defaults]),	
 	List=try_check_defaults(Defaults, []),
 	FilteredList=filter_entries(List, []),
 	load_defaults(Modules, Acc++[{Module, FilteredList}]).
@@ -334,7 +335,7 @@ try_load_module_defaults(Module) ->
 	catch
 		_:_ ->
 			?LOG:log(debug, "config: no defaults for module: ", [Module]),
-			no_defaults
+			[]
 	end.
 
 
@@ -678,3 +679,10 @@ get_module_entries(ModuleName, [Entry|Rest], Acc) ->
 	
 	
 	
+%% ----------------------        ------------------------------
+%%%%%%%%%%%%%%%%%%%%%%%%%  TEST  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% ----------------------        ------------------------------
+
+test() ->
+	Modules=[twitter_app, twitter_log],
+	do_config(Modules).	

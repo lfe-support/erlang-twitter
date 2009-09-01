@@ -33,16 +33,7 @@ start_link(Args) ->
 %%          {error, Reason}
 %% --------------------------------------------------------------------
 init(_Args) ->
-	
-	_Servers=[log, clock, hwswitch, app, snooper],
-	
-	%% HWSwitch Subscriptions
-	Switch_Subs = [
-				    {clock, [twitter_app, config]} 
-				   ,{sys,   [twitter_app, config, snooper]}
-				   ,{log,   [logger]}
-				  ],
-	
+
 	
 	%% Add all modules here
 	Modules = [twitter_log, twitter_hwswitch, twitter_clock, twitter_config, twitter_app, twitter_snooper ],
@@ -52,7 +43,7 @@ init(_Args) ->
     Child_logger = {twitter_log,{twitter_log, start_link,[{logfilename, "/var/log/twitter.log"}]},
 	      permanent,2000,worker,[twitter_log]},
 
-    Child_switch = {twitter_hwswitch,{twitter_hwswitch, start_link,[Switch_Subs]},
+    Child_switch = {twitter_hwswitch,{twitter_hwswitch, start_link,[mods, Modules]},
 	      permanent,2000,worker,[twitter_hwswitch]},
 
     Child_clock = {twitter_clock,{twitter_clock, start_link,[]},

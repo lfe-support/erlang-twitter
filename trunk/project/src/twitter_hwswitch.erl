@@ -30,6 +30,11 @@
 %% through it, the module responds with a {hswitch.bound, Bus, Msg}
 %% message back to the caller.
 %%
+%% == Start-up ==
+%%
+%% This module can auto-configure itself when provided with a list
+%% of modules to query for the required information.
+%%
 -module(twitter_hwswitch).
 -compile({nowarn_unused_function, [
 			{hpublish, 4}, {hpublish2, 4}
@@ -60,21 +65,20 @@
 %% API Functions
 %%
 -export([
-		 start_link/3
+		start_link/2
 		,publish/2, publish/3
 		]).
 
 %%@doc Starts this server in debug mode
 %% 
-%% @spec start_link(subs, Subs, {debug, Debug}) -> {ok, Pid}
+%% @spec start_link(subs, Subs) -> {ok, Pid}
 %% where
 %%	Subs = [{Bus, SubList}]
-%%  Debug = on | off
 %%	Bus = atom()
 %%	@type SubList = list().  A list of registered names
 %%
-start_link(subs, Subs, {debug, Debug}) when is_list(Subs) ->
-	run_subs(Subs, Debug);
+start_link(subs, Subs) when is_list(Subs) ->
+	run_subs(Subs);
 
 
 %%@doc Starts this server by specifying a Modules list
@@ -84,28 +88,27 @@ start_link(subs, Subs, {debug, Debug}) when is_list(Subs) ->
 %%	Modules = [atom()]
 %%  Debug = on | off
 %%
-start_link(mods, Modules, {debug, Debug}) when is_list(Modules) ->
-	run_mods(Modules, Debug);
+start_link(mods, Modules) when is_list(Modules) ->
+	run_mods(Modules);
 
 
-start_link(_,_,_) ->
+start_link(_,_) ->
 	{error, unknown_params}.
 
 
 %% @private
-run_subs(Subs, Debug) ->
-	do_start(Subs, {debug, Debug}).
+run_subs(Subs) ->
+	do_start(Subs).
 
-run_mods(Modules, Debug) ->
+run_mods(Modules) ->
 	Subs=get_module_subs(Modules),
-	do_start(Subs, {debug, Debug}).
+	do_start(Subs).
 
 
 %% @private
-do_start(Subs, Msg) ->
+do_start(Subs) ->
 	Pid=spawn_link(?MODULE, loop, [Subs]),
 	register(?SERVER, Pid),
-	Pid ! Msg,
 	{ok, Pid}.
 
 
