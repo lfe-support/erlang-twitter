@@ -52,6 +52,7 @@
 		 start_link/1
 		 ,stop/0
 		 ,get_server/0
+		 ,get_busses/0
 		 ]).
 
 
@@ -73,8 +74,8 @@
 %% ----------------------              ------------------------------
 %%%%%%%%%%%%%%%%%%%%%%%%%  Management  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% ----------------------              ------------------------------
-get_server() ->
-	?SERVER.
+get_server() ->	?SERVER.
+get_busses() -> ?BUSSES.
 
 start_link(_Args) ->
 	Pid=spawn_link(?MODULE, loop, []),

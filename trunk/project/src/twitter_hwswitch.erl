@@ -51,6 +51,7 @@
 		,tloop/0
 		,kstart/1
 		,kloop/1
+		,get_module_subs/1
 		 ]).
 
 -define(SERVER, hwswitch).
@@ -59,26 +60,54 @@
 %% API Functions
 %%
 -export([
-		 start_link/1
+		 start_link/3
 		,publish/2, publish/3
 		]).
 
-
-%%@doc Starts this server
+%%@doc Starts this server in debug mode
 %% 
-%% @spec start_link(Subs) -> {ok, Pid}
+%% @spec start_link(subs, Subs, {debug, Debug}) -> {ok, Pid}
 %% where
 %%	Subs = [{Bus, SubList}]
+%%  Debug = on | off
 %%	Bus = atom()
 %%	@type SubList = list().  A list of registered names
 %%
-start_link(Subs) when is_list(Subs) ->
+start_link(subs, Subs, {debug, Debug}) when is_list(Subs) ->
+	run_subs(Subs, Debug);
+
+
+%%@doc Starts this server by specifying a Modules list
+%% 
+%% @spec start_link(mods, Modules, {debug, Debug}) -> {ok, Pid}
+%% where
+%%	Modules = [atom()]
+%%  Debug = on | off
+%%
+start_link(mods, Modules, {debug, Debug}) when is_list(Modules) ->
+	run_mods(Modules, Debug);
+
+
+start_link(_,_,_) ->
+	{error, unknown_params}.
+
+
+%% @private
+run_subs(Subs, Debug) ->
+	do_start(Subs, {debug, Debug}).
+
+run_mods(Modules, Debug) ->
+	Subs=get_module_subs(Modules),
+	do_start(Subs, {debug, Debug}).
+
+
+%% @private
+do_start(Subs, Msg) ->
 	Pid=spawn_link(?MODULE, loop, [Subs]),
 	register(?SERVER, Pid),
-	{ok, Pid};
+	Pid ! Msg,
+	{ok, Pid}.
 
-start_link(U) ->
-	{error, {unknown_param, U}}.
 
 %% @doc Publishes a Message on a Bus
 %%		Sends a
@@ -123,6 +152,9 @@ loop(Subs) ->
 	receive
 		stop -> 
 			exit(ok);
+		
+		{debug, Debug} ->
+			put(debug, Debug);
 
 		{publish, From, Bus, Msg} ->
 			hpublish(Subs, From, Bus, Msg);
@@ -257,6 +289,115 @@ is_alive(_Name, Pid) when is_pid(Pid) ->
 
 is_alive(_,_) ->
 	false.
+
+
+%% @doc Retrieves the Subscriptions for Modules 
+%%
+%% @spec get_module_subs(Modules) -> SubsList
+%% where
+%%	Modules=[atom()].  Registered names
+%%	@type SubsList=[atom()].  List of bus names
+%%
+get_module_subs(Modules) ->
+	get_module_subs(Modules, []).
+
+get_module_subs([], Subs) ->
+	Subs;
+
+get_module_subs(Modules, Subs) when is_list(Modules) ->
+	[ModuleName|Rest]=Modules,
+	try
+		Busses=erlang:apply(ModuleName, get_busses, []),
+		UpdatedSubs=update_subs(ModuleName, Busses, Subs),
+		get_module_subs(Rest, UpdatedSubs)
+	catch
+		_:_ ->
+			io:format("hwswitch: no busses found for module[~p]~n", [ModuleName]),
+			get_module_subs(Rest, Subs)
+	end.
+	
+
+%% @doc Update a list of bus subscriptions
+%%
+%% CurrentSubs=[{BusName, [Subscribers]}]
+%%
+update_subs(ModuleName, Busses, CurrentSubs) ->
+	Server=get_module_server(ModuleName),
+	update_subs(ModuleName, Busses, CurrentSubs, Server).
+
+
+update_subs(_ModuleName, [], CurrentSubs, _Server) ->
+	CurrentSubs;
+
+update_subs(ModuleName, Busses, CurrentSubs, Server) when is_list(Busses) ->
+	[Bus|Rest] = Busses,
+	UpdatedSubs=add_to_tuple_list(CurrentSubs, Bus, Server),
+	update_subs(ModuleName, Rest, UpdatedSubs, Server);
+
+
+update_subs(ModuleName, Other, _CurrentSubs, _Server) ->
+	io:format("hwswitch: expecting 'busses' list (got[~p]) for module[~p]~n",[Other, ModuleName]).
+	
+
+
+get_module_server(ModuleName) ->
+	try
+		erlang:apply(ModuleName, get_server, [])
+	catch
+		_:_ ->
+			io:format("hwswitch: not server found for module[~p]~n", [ModuleName]),
+			undefined
+	end.
+
+
+
+%% @doc Adds (respecting uniqueness) an Element
+%%		to a specific tuple in a List
+%%
+%% @spec add_to_tuple_list(List, TupleName, Element) -> TupleList
+%% where
+%%	List = list().  Tuple list
+%%	TupleName= atom()
+%%	Element = term()
+%%	@type TupleList = [{ItemName, ItemValue}]
+%%	@type ItemName = atom()
+%%	@type ItemValue = term()
+%%
+add_to_tuple_list(List, TupleName, Element) when is_atom(TupleName), is_list(List) ->
+	do_add_to_tuple_list(List, TupleName, Element);
+
+add_to_tuple_list(_,_,_) ->	{error, invalid_params}.
+
+
+%% Trivial case... also makes an example for target return format
+do_add_to_tuple_list([], TupleName, Element) when is_list(Element)->
+	[{TupleName, Element}];
+
+do_add_to_tuple_list([], TupleName, Element) when is_atom(Element)->
+	[{TupleName, [Element]}];
+
+
+do_add_to_tuple_list(List, TupleName, Element) ->
+	case is_list(Element) of
+		true  -> E=Element;
+		false -> E=[Element]
+	end,
+	
+	Tuple=kfind(TupleName, List),
+	case Tuple of
+		{} ->
+			List++[{TupleName, E}];
+		
+		{_, Value} ->
+			FNewList=List--[Tuple],
+			FNewValue=Value--E,
+			NewValue=FNewValue++E,
+			FNewList++[{TupleName,NewValue}]
+	end.
+
+
+
+
 
 
 %% ----------------------         ------------------------------

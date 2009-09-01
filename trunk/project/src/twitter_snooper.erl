@@ -62,6 +62,7 @@
 
 -define(MSWITCH, mswitch).
 -define(SERVER, snooper).
+-define(BUSSES, [sys]).
 -define(SWITCH, twitter_hwswitch).
 -define(MSWITCH_BUSSES, [notif]).
 
@@ -80,6 +81,7 @@
 		 start_link/1
 		 ,stop/0
 		 ,get_server/0
+		 ,get_busses/0
 		 ]).
 
 -export([
@@ -114,8 +116,8 @@ defaults() ->
 %% ----------------------              ------------------------------
 %%%%%%%%%%%%%%%%%%%%%%%%%  Management  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% ----------------------              ------------------------------
-get_server() ->
-	?SERVER.
+get_server() ->	?SERVER.
+get_busses() -> ?BUSSES.
 
 start_link(_Args) ->
 	Pid=spawn_link(?MODULE, loop, []),

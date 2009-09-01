@@ -677,16 +677,4 @@ get_module_entries(ModuleName, [Entry|Rest], Acc) ->
 	end.
 	
 	
-
-
-
-split_by_module(Config) ->
-	split_by_module(Config, []).
-
-split_by_module([], Acc) -> Acc;
-
-split_by_module([Entry|Rest], Acc) ->
-	{ParamName, Value} = Entry.
-
-
 	
