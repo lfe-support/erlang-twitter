@@ -554,7 +554,8 @@ rem_from_tuple_list(List, GroupName, TupleName) ->
 					PartialList=List--make_list({GroupName,GroupEntries}),
 					%io:format("PartialList: ~p~n",[PartialList]),
 					NewGroup=GroupEntries--make_list(Entry),
-					PartialList ++ {GroupName, NewGroup}
+					%io:format("NewGroup: ~p~n",[NewGroup]),
+					PartialList ++ [{GroupName, NewGroup}]
 			end
 	end.
 
