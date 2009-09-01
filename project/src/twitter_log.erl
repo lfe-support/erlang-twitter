@@ -59,7 +59,7 @@
 -export([
 		 start_link/0, start_link/1
 		 ,get_server/0
-		 ,log/1, log/2
+		 ,log/1, log/2, log/3
 		 ]).
 
 %% LOCALS
@@ -239,8 +239,9 @@ log(Severity, Msg, Params) ->
 	dolog(Severity, Logger, Msg, Params).
 
 
-dolog(_Severity, undefined, _, _Params) ->
-	io:format("Logger undefined!~n"),
+dolog(Severity, undefined, Msg, Params) ->
+	{{Year,Month,Day},{Hour,Min,Sec}} = calendar:now_to_datetime(erlang:now()),
+	io:format("~2B/~2B/~4B ~2B:~2.10.0B:~2.10.0B [~s] ~s:  ~p ~p~n",[Day, Month, Year,Hour,Min,Sec, Severity, ?DEFAULT_LOG, Msg]++Params),
 	inc_stat(?STAT_LOG_ERROR);
 
 dolog(Severity, Logger, Msg, []) ->

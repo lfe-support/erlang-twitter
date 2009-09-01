@@ -44,6 +44,7 @@
 -define(BUSSES, [sys, clock]).
 -define(SWITCH, twitter_hwswitch).
 -define(SERVER, config).
+-define(CTOOLS, twitter_ctools).
 
 %%
 %% Management Functions
@@ -61,6 +62,7 @@
 %%
 -export([
 		 loop/0
+	   	,test/0
 		 ]).
 
 %%
@@ -175,3 +177,11 @@ defaults() ->
 
 
 
+%% ----------------------        ------------------------------
+%%%%%%%%%%%%%%%%%%%%%%%%%  TEST  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% ----------------------        ------------------------------
+
+test() ->
+	Modules=[twitter_app, twitter_log],
+	
+	ok.
