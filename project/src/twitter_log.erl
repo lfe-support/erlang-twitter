@@ -238,6 +238,11 @@ log(Severity, Msg, Params) ->
 	Logger=get(log),
 	dolog(Severity, Logger, Msg, Params).
 
+dolog(Severity, undefined, Msg, []) ->
+	{{Year,Month,Day},{Hour,Min,Sec}} = calendar:now_to_datetime(erlang:now()),
+	io:format("~2B/~2B/~4B ~2B:~2.10.0B:~2.10.0B [~s] ~s:  ~p~n",[Day, Month, Year,Hour,Min,Sec, Severity, ?DEFAULT_LOG, Msg]),
+	inc_stat(?STAT_LOG_ERROR);
+
 
 dolog(Severity, undefined, Msg, Params) ->
 	{{Year,Month,Day},{Hour,Min,Sec}} = calendar:now_to_datetime(erlang:now()),

@@ -29,19 +29,27 @@
 -define(MNG,      twitter_mng).
 -define(RPC,      twitter_rpc).
 
-%% MSWITCH busses to subscribe to
--define(BUSSES,        [notif]).
--define(MSWITCH_HEART, 30*1000).
--define(TIMER_CHECK,   60*1000).
+-define(SWITCH,      twitter_hwswitch).
+-define(BUSSES,      [sys, clock]).
+-define(TIMER_CHECK, 60*1000).
 
 %%
 %% Exported Functions
 %%
 -export([
-		 start/0,
 		 start_link/0,
 		 stop/0,
 		 daemon_api/2
+		,get_server/0
+		,get_busses/0
+		 ]).
+
+%%
+%% Config Functions
+%%
+-export([
+		 defaults/0,
+		 blacklist/0
 		 ]).
 
 
@@ -49,25 +57,16 @@
 
 %% LOCAL
 -export([
-		 loop/0,
-		 inbox/1
+		 loop/0
 		 ]).
 
 
 %% ----------------------            ------------------------------
 %%%%%%%%%%%%%%%%%%%%%%%%% MANAGEMENT %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% ----------------------            ------------------------------
+get_server() -> ?SERVER.
+get_busses() -> ?BUSSES.
 
-
-%% Start
-%%
-%% @spec start() -> {ok, Pid}
-start() ->
-	inets:start(),
-	Pid = spawn(?MODULE, loop, []),
-	register(?SERVER, Pid),
-	?SERVER ! reload,
-	{ok,Pid}.
 
 %% Start Link
 %%
@@ -81,10 +80,15 @@ start_link() ->
 
 %% Stop
 %%
-%% @spec stop() -> ok
+%% @spec stop() -> ok | {error, Reason} 
 stop() ->
-	?SERVER ! stop,
-	ok.
+	try
+		?SERVER ! stop,
+		ok
+	catch 
+		_:_ ->
+			{error, cannot_stop}
+	end.
 
 
 %% ----------------------             ------------------------------
@@ -95,20 +99,9 @@ stop() ->
 %% @private
 loop() ->
 	receive
-		reload ->
-			?LOGGER:init(),
-			?MNG:load_config(),
-			?POLICER:init(),
-			?LOG:init(),
-			
-			config_timer(),
-			do_sync();
-		
-		timer_tick ->
-			do_heart();
 		
 		stop ->
-			exit(ok);
+			exit(normal);
 		
 		%% RPC bridge
 		%%
@@ -118,11 +111,6 @@ loop() ->
 		{rpc, ReplyTo, {FromNode, ReplyContext, Q}} ->
 			?RPC:handle_rpc(ReplyTo, FromNode, ReplyContext, Q);
 
-		%% Messages received 
-		{mswitch, _From, Message} ->
-			?MNG:inc_stat(mswitch_message_received),
-			io:format("mswitch:msg: ~p~n", [Message]);
-		
 		
 		{request, ReplyDetails, Auth, Method, MandatoryParams, OptionalParams} ->
 			?TAPI:request(ReplyDetails, ?TIMEOUT, Auth, Method, MandatoryParams, OptionalParams);
@@ -150,28 +138,6 @@ loop() ->
 	loop().
 
 
-%% @doc Make sure that the timer is up & running
-%%      & reload configuration
-%%
-config_timer() ->
-	TimerRef=get(timer_ref),
-	
-	%% no exception is throwed if invalid
-	timer:cancel(TimerRef),
-	
-	%% Get interval
-	Interval=get({param, refresh_mswitch}),
-	
-	%% send 'timer_tick' message to self()
-	Result=timer:send_interval(Interval, timer_tick),
-	config_timer_handle_result(Result).
-
-config_timer_handle_result({ok, Tref}) ->
-	put(timer, Tref);
-
-config_timer_handle_result(_) ->
-	?MNG:inc_stat(error_timer_interval).
-	
 
 
 %% ----------------------                   ------------------------------
@@ -189,66 +155,35 @@ daemon_api(ReplyContext, Command) ->
 	end.
 
 
-%% ----------------------         ------------------------------
-%%%%%%%%%%%%%%%%%%%%%%%%% MSWITCH %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% ----------------------         ------------------------------
 
-%% Performs synchronization with MSWITCH
+%% ----------------------          ------------------------------
+%%%%%%%%%%%%%%%%%%%%%%%%%  LOGGER  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% ----------------------          ------------------------------
+
+%%log(Severity, Msg) ->
+%%	log(Severity, Msg, []).
+
+log(Severity, Msg, Params) ->
+	?SWITCH:publish(log, {?SERVER, {Severity, Msg, Params}}).
+
+%% ----------------------          ------------------------------
+%%%%%%%%%%%%%%%%%%%%%%%%%  CONFIG  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% ----------------------          ------------------------------
+
+%% @doc List of parameters which cannot be customized
 %%
-do_sync() ->
-	try
-		{_Pid, ok}=mswitch:subscribe({?MODULE, inbox, ?SERVER}, ?BUSSES),
-		put(mswitch, found)
-	catch
-		error:undef ->
-			?MNG:inc_stat(mswitch_not_found),
-			put(mswitch, not_found),
-			?LOG:log(mswitch_error, error, "mswitch not found"),
-			error;
-
-		_:_ ->
-			?MNG:inc_stat(mswitch_node_not_found),
-			put(mswitch, not_found),
-			?LOG:log(mswitch_error, error, "mswitch node not found"),
-			error
-	end.
-
-%% @doc Heartbeat publication on mswitch bus 'heart'
+%% @spec blacklist() -> list()
 %%
-do_heart() ->
-	State=get(mswitch),
-	case State of
-		found ->
-			%% we believe the mswitch is accessible
-			do_heart_publish();
-		_ ->
-			%% we didn't find it the last time around...
-			%% try this time
-			do_sync(),
-			do_heart_publish()
-	end.
+blacklist() ->
+	[].
 
-do_heart_publish() ->
-	try
-		{_Pid, ok}=mswitch:publish(heart, {twitter, now()}),
-		put(mswitch, found)
-	catch
-		error:undef ->
-			?MNG:inc_stat(mswitch_not_found),
-			put(mswitch, not_found),
-			error;
-
-		_:_ ->
-			?MNG:inc_stat(mswitch_node_not_found),
-			put(mswitch, not_found),
-			error
-	end.
-	
-
-
-%% @doc MSWITCH Mailbox
+%% @doc List of default parameters for the module
 %%
-inbox({FromNode, Server, Message}) ->
-	%%io:format("inbox: FromNode[~p] Server[~p] Message[~p]~n",[FromNode, Server, Message]),
-	Server ! {mswitch, FromNode, Message}.
+%% @spec defaults() -> list()
+%%
+defaults() ->
+	[
+	 {twitter.user, mandatory, nstring, ""}
+	,{twitter.pass, mandatory, nstring, ""}
+	 ].
 

@@ -179,8 +179,8 @@ check_type2(Key, _ConfigEntry, {}) ->
 	no_default;
 
 check_type2(Key, {Ckey, Cvalue}, DefaultEntry) ->
-	TargetType=get_type(DefaultEntry),
-	DefaultValue=get_value(DefaultEntry),
+	{type, TargetType}=get_type(DefaultEntry),
+	{value, DefaultValue}=get_value(DefaultEntry),
 	check_type3(Key, Ckey, TargetType, Cvalue, DefaultValue).
 
 check_type3(_Key, _Ckey, atom,   Cvalue, _Dvalue) when is_atom(Cvalue)    -> ok;
@@ -199,16 +199,16 @@ check_type3(Key,  _Ckey, nstring,Cvalue, _Dvalue) when is_list(Cvalue) ->
 check_limits([], _Defaults, Acc) ->
 	Acc;
 
-check_limits([ConfigEntry|Entries], Defaults, []) ->
+check_limits([ConfigEntry|Entries], Defaults, Acc) ->
 	Entry=check_limit_one(ConfigEntry, Defaults),
-	check_limits(Entries, Defaults, Defaults++[Entry]).
+	check_limits(Entries, Defaults, Acc++[Entry]).
 
 
 
 check_limit_one({Key, Value}, Defaults) ->
 	case has_pattern(['.min', '.max'], Key) of
-		true  -> {Key, Value};
-		false ->
+		false -> {Key, Value};
+		true  ->
 			MinResult=get_min(Defaults, Key),
 			MaxResult=get_max(Defaults, Key),
 			check_limit_one2({Key, Value}, MinResult, MaxResult)
@@ -458,7 +458,9 @@ get_entry_from_defaults([], _Key) -> {};
 %% @spec get_entry_from_defaults(Defaults, Key) -> Entry
 %%
 get_entry_from_defaults([ModuleEntries|Modules], Key) ->
-	Entry=?TOOLS:kfind(Key, ModuleEntries),
+	{_ModuleName, Entries}=ModuleEntries,
+	%io:format("get_entry_from_defaults: Key[~p] Entries[~p]~n",[Key, Entries]),
+	Entry=?TOOLS:kfind(Key, Entries),
 	case Entry of
 		{} ->
 			get_entry_from_defaults(Modules, Key);
@@ -644,31 +646,34 @@ get_module_server(Module) ->
 %% @spec merge(Defaults, Config) -> [tuple()]
 %%
 merge(Defaults, Config) ->
+	io:format("merge: defaults<~p>~n", [Defaults]),
+	io:format("merge: config<~p>~n", [Config]),
+	
+	% start with all the Defaults in list
 	do_merge(Config, Defaults).
 
 
 do_merge([], Acc) ->
 	Acc;
 
-do_merge([ModuleEntries|Rest], Acc) ->
+do_merge([ConfigEntry|ConfigEntries], Acc) ->
 	try
-		{ModuleName, RawEntries}=ModuleEntries,
-		Entries=do_merge_module_entries(ModuleName, RawEntries, []),
-		do_merge(Rest, Acc++Entries)
+		{ParamName, Value}=ConfigEntry,
+		ModuleName=extract_module_name(ParamName),
+		NewList=insert_entry(ModuleName, ParamName, Value, Acc),
+		do_merge(ConfigEntries, NewList)
 	catch
 		_:_ ->
-			?LOG:log(error, "config: error whilst merging defaults+config")
+			?LOG:log(error, "config: error whilst merging defaults+config"),
+			{error, merging}
 	end.
-	
 
 
-do_merge_module_entries(_ModuleName, [], Acc) ->
-	Acc;
-	
-do_merge_module_entries(ModuleName, [ModuleEntry|Rest], Acc) ->
-	{ParamName, Value}=ModuleEntry,
-	Atom=?TOOLS:make_atom_from_list([ModuleName, '.', ParamName]),
-	do_merge_module_entries(ModuleName, Rest, Acc++[{Atom, Value}]).
+insert_entry(ModuleName, ParamName, Value, List) ->
+	NewList=?TOOLS:rem_from_tuple_list(List, ModuleName, ParamName),
+	?TOOLS:add_to_tuple_list(NewList, ModuleName, {ParamName, Value}).
+
+
 
 
 
@@ -678,6 +683,10 @@ is_for_module(ModuleName, Key) ->
 
 is_for_module2(X, X) -> true;
 is_for_module2(_, _) -> false.
+
+
+extract_module_name(Key) ->
+	?TOOLS:extract_head(Key).
 
 
 
@@ -700,5 +709,5 @@ get_module_entries(ModuleName, [Entry|Rest], Acc) ->
 %% ----------------------        ------------------------------
 
 test() ->
-	Modules=[twitter_app, twitter_log],
+	Modules=[twitter_app, twitter_log, twitter],
 	do_config(Modules).	
