@@ -3,9 +3,7 @@
 %% Description: TODO: Add description to tools
 -module(twitter_tools).
 
-%%
-%% Include files
-%%
+-compile(export_all).
 
 %%
 %% Exported Functions
@@ -56,6 +54,7 @@
 		 ,vsize/1
 		 ,is_alive/1, is_alive/2
 		 ,extract_head/1, extract_head/2, extract_head2/1
+		 ,add_to_tuple_list/3
 		 ]).
 
 %%
@@ -243,12 +242,15 @@ format_encoded_list(Liste) ->
 	"?"++Liste.
 
 
+kfind(_Key, []) ->	{};
+
 %% @doc Searches through a tuple list for Key
 %%
 %% @spec kfind(Key, List) -> {} | {Key, Value}
-%%
-kfind(_Key, []) ->	{};
-
+%% where
+%%	Key = atom()
+%%	List = [tuple()]
+%%	Value = term()
 kfind(Key, List) ->
 	case erlang:is_builtin(lists, keyfind, 3) of
 		true  ->
@@ -264,10 +266,17 @@ kfind(Key, List) ->
 			end
 	end.
 
-%% Returns {Key, Default} if not found or {Key, Value} otherwise
 kfind(Key, [], Default) ->
 	{Key, Default};
 
+%% @doc Returns {Key, Default} if not found or {Key, Value} otherwise
+%%
+%% @spec kfind(Key, List, Default) -> {Key, Value} | {}
+%% where
+%%	Key = atom()
+%%	List = [tuple()]
+%%	Value = term()
+%%	Default = term()
 kfind(Key, List, Default) ->
 	case kfind(Key, List) of
 		false        -> {Key, Default};
@@ -474,4 +483,63 @@ extract_head2([Head|_Rest]) ->
 	erlang:list_to_atom(Head).
 	
 	
+%% @doc Adds (respecting uniqueness) an Element
+%%		to a specific tuple in a List
+%%
+%% @spec add_to_tuple_list(List, TupleName, Element) -> TupleList
+%% where
+%%	List = list().  Tuple list
+%%	TupleName= atom()
+%%	Element = term()
+%%	@type TupleList = [{ItemName, ItemValue}]
+%%	@type ItemName = atom()
+%%	@type ItemValue = term()
+%%
+add_to_tuple_list(List, TupleName, Element) when is_atom(TupleName), is_list(List) ->
+	do_add_to_tuple_list(List, TupleName, Element);
+
+add_to_tuple_list(_,_,_) ->	{error, invalid_params}.
+
+
+%% Trivial case... also makes an example for target return format
+do_add_to_tuple_list([], TupleName, Element) when is_list(Element)->
+	[{TupleName, Element}];
+
+do_add_to_tuple_list([], TupleName, Element) when is_atom(Element)->
+	[{TupleName, [Element]}];
+
+do_add_to_tuple_list(List, TupleName, Element) ->
+	case is_list(Element) of
+		true  -> E=Element;
+		false -> E=[Element]
+	end,
 	
+	Tuple=kfind(TupleName, List),
+	case Tuple of
+		{} ->
+			List++[{TupleName, E}];
+		
+		{_, Value} ->
+			FNewList=List--[Tuple],
+			FNewValue=Value--E,
+			NewValue=FNewValue++E,
+			FNewList++[{TupleName,NewValue}]
+	end.
+
+
+
+
+%% ----------------------         ------------------------------
+%%%%%%%%%%%%%%%%%%%%%%%%%  TESTS  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% ----------------------         ------------------------------
+t1() ->
+	L1=[{a1, []}, {a2, [a21]}],
+	A1=[a11, a12, a13],
+	add_to_tuple_list(L1, a1, A1).
+
+t2() ->
+	L1=[{a1, []}, {a2, [a21]}],
+	A2=[a22, a23, a24],
+	add_to_tuple_list(L1, a2, A2).
+
+
