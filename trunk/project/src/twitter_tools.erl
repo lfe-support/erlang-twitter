@@ -252,15 +252,20 @@ kfind(_Key, []) ->	{};
 %%	List = [tuple()]
 %%	Value = term()
 kfind(Key, List) ->
+	case is_list(List) of
+		true  -> TheList=List;
+		false -> TheList=[List]
+	end,
+	
 	case erlang:is_builtin(lists, keyfind, 3) of
 		true  ->
-			case lists:keyfind(Key,1,List) of
+			case lists:keyfind(Key,1,TheList) of
 				false -> {};
 				Tuple -> Tuple
 			end;
 
 		false ->
-			case lists:keysearch(Key,1,List) of
+			case lists:keysearch(Key,1,TheList) of
 				{value, Value} -> Value;
 				_              -> {}
 			end

@@ -16,8 +16,16 @@
 %%
 do_config(Modules) ->
 	Defaults=get_defaults(Modules),
-	Config=process_config(Modules, Defaults),
-	merge(Defaults, Config).
+	io:format("Defaults: ~p~n", [Defaults]),	
+	Result=process_config(Modules, Defaults),
+	case Result of
+		{ok, Mtime, Config} ->
+			io:format("Config: ~p~n", [Config]),
+			Merged=merge(Defaults, Config),
+			io:format("Merged: ~p~n", [Merged]);		
+		Other ->
+			Other
+	end.
 
 
 
@@ -38,12 +46,17 @@ process_config(Modules, Defaults) ->
 			{error, Reason};
 		
 		{ok, Mtime, Config} ->
+			
+			io:format("Config file content: ~p~n", [Config]),
+			
 			%% 1) check format
 			List=  do_process_config(Config, []),
 			Blacklist=get_blacklist(Modules, []),
 			
 			%% 2) filter on blacklist
 			List2= filter_on_blacklist(List, Blacklist, []),
+			
+			io:format("After blacklist: ~p~n", [List2]),
 			
 			List3= filter_on_patterns(['.min', '.max'], List2, []),
 			
@@ -53,13 +66,15 @@ process_config(Modules, Defaults) ->
 			%% 4) type check
 			List4=check_type(List2, Defaults, []),
 			
+			List5=filter_entries(List4, []),
+			
 			%% 5) check limit requirements
-			List5=check_limits(List4, Defaults, []),
+			List6=check_limits(List5, Defaults, []),
 	
 			%% Remove unnecessary entries such as {}
-			List6=filter_entries(List5, []),
+			List7=filter_entries(List6, []),
 			
-			{ok, Mtime, List6}			
+			{ok, Mtime, List7}			
 	end.
 
 do_process_config([], Acc) ->
@@ -68,7 +83,7 @@ do_process_config([], Acc) ->
 do_process_config(Config, Acc) when is_list(Config) ->
 	[Entry|Rest] = Config,
 	Fentry = filter_one(Entry),
-	process_config(Rest, Acc++[Fentry]).
+	do_process_config(Rest, Acc++[Fentry]).
 
 
 filter_one({}) -> {};
@@ -410,6 +425,7 @@ check3_one_default({Key, Level, Type, Value}) when Type==atom ->
 
 
 filter_entries([], Acc)           -> Acc;
+filter_entries([[]|Rest], Acc)    -> filter_entries(Rest, Acc);
 filter_entries([{}|Rest], Acc)    -> filter_entries(Rest, Acc);
 filter_entries([Entry|Rest], Acc) -> filter_entries(Rest, Acc++[Entry]).
 
