@@ -532,6 +532,38 @@ do_add_to_tuple_list(List, TupleName, Element) ->
 	end.
 
 
+%% @doc Removes a tuple from list
+%%
+%% @spec rem_from_tuple_list(List, GroupName, TupleName) -> list()
+%% where
+%%	List=[tuple()]
+%%	GroupName=atom()
+%%	TupleName=atom()
+%%
+rem_from_tuple_list(List, GroupName, TupleName) ->
+	Group=kfind(GroupName, List),
+	case Group of
+		{} -> List;
+		{GroupName, GroupEntries} ->
+			%io:format("GroupEntries: ~p~n", [GroupEntries]),
+			Tuple=kfind(TupleName, GroupEntries),
+			case Tuple of
+				{}    -> List;
+				Entry ->
+					%io:format("Entry: ~p~n", [Entry]),
+					PartialList=List--make_list({GroupName,GroupEntries}),
+					%io:format("PartialList: ~p~n",[PartialList]),
+					NewGroup=GroupEntries--make_list(Entry),
+					PartialList ++ {GroupName, NewGroup}
+			end
+	end.
+
+
+
+make_list(List) when is_list(List) -> List;
+make_list(SomeTerm) -> [SomeTerm].
+
+
 
 
 %% ----------------------         ------------------------------
@@ -547,4 +579,7 @@ t2() ->
 	A2=[a22, a23, a24],
 	add_to_tuple_list(L1, a2, A2).
 
+t3() ->
+	L=[{a, [{a1, a1v}, {a2, a2b}, {a3, a3v}] }, {b, [{b1, b1v}, {b2, b2v}]} ],
+	rem_from_tuple_list(L, b, b1).
 
