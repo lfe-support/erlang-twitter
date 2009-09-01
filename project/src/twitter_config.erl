@@ -31,7 +31,7 @@
 %%  <li>Listen for 'sys.mod.config'</li>
 %%  <li>Listen for 'clock.tick.min'</li>
 %%  <li>Listen for 'clock.tick.sync'</li>
-%%  <li>Generate 'sys.config'</li>
+%%  <li>Generate 'sys.config' (i.e. configuration version)</li>
 %% </ul>
 %%
 %%
@@ -44,6 +44,7 @@
 -define(BUSSES, [sys, clock]).
 -define(SWITCH, twitter_hwswitch).
 -define(SERVER, config).
+-define(TOOLS, twitter_tools).
 -define(CTOOLS, twitter_ctools).
 
 %%
@@ -62,7 +63,6 @@
 %%
 -export([
 		 loop/0
-	   	,test/0
 		 ]).
 
 %%
@@ -123,12 +123,18 @@ loop() ->
 %% ----------------------            ------------------------------
 
 
-%% Not much to do
 handle({hwswitch, _From, sys, reload}) ->
-	ok;
+	do_load_config();
 
-handle({hwswitch, _From, sys, reload}) ->
-	ok;
+% A module announces its configuration version
+handle({hwswitch, From, sys, {mod.config, Module, ConfigVersion}}) ->
+	maybe_send_config_to_module(From, Module, ConfigVersion);
+
+handle({hwswitch, _From, clock, {tick.min, _Count}}) ->
+	'sys.config'();
+
+handle({hwswitch, _From, clock, {tick.sync, _Count}}) ->
+	'sys.config'();	
 
 handle(Other) ->
 	log(warning, "Unexpected message: ", [Other]).
@@ -139,19 +145,73 @@ handle(Other) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%  DOERS  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% ----------------------         ------------------------------
 
+do_load_config() ->
+	
+	%% erase all process information
+	erase(),
+	
+	Result=?CTOOLS:do_config(),
+	case Result of
+		{ok, Version, Config} ->
+			put(config, Config),
+			put(version, Version);
+		Other ->
+			log(error, "error processing configuration file. Reason: ", [Other])			
+	end.
 
 
+'sys.config'() ->
+	Version=get(version),
+	?SWITCH:publish(sys, {config, Version}).
 
 
+maybe_send_config_to_module(ModuleServer, Module, ModuleConfigVersion) ->
+	CurrentVersion=get(version),
+	send(ModuleServer, Module, ModuleConfigVersion, CurrentVersion).
+
+% can't do much right now...
+send(_ModuleServer, _Module, _ModuleConfigVersion, undefined) ->
+	ok;
+
+send(_ModuleServer, Module, X, X) ->
+	log(debug, "Configuration up-to-date for module: ",[Module]);
 
 
+send(ModuleServer, Module, _ModuleConfigVersion, CurrentVersion) ->
+	Config=get(config),
+	maybe_send(ModuleServer, Module, Config, CurrentVersion).
+	
+
+maybe_send(_Server, _Module, undefined, _CurrentVersion) ->
+	log(debug, "configuration not available");
+
+maybe_send(Server, Module, Config, CurrentVersion) ->
+	ModuleConfig=?TOOLS:kfind(Module, Config),
+	case ModuleConfig of
+		{_, ConfigEntries} ->
+			safe_send(Server, {config, CurrentVersion, ConfigEntries});
+		Other ->
+			log(error, "error retrieving config info, {Module, Reason}", [Module, Other])
+	end.
+
+	
+
+safe_send(Server, Msg) ->
+	try
+		Server ! Msg
+	catch
+		_:_ ->
+			log(error, "error sending configuration to module server:", [Server])
+	end.
+
+			
 
 %% ----------------------          ------------------------------
 %%%%%%%%%%%%%%%%%%%%%%%%%  LOGGER  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% ----------------------          ------------------------------
 
-%%log(Severity, Msg) ->
-%%	log(Severity, Msg, []).
+log(Severity, Msg) ->
+	log(Severity, Msg, []).
 
 log(Severity, Msg, Params) ->
 	?SWITCH:publish(log, {?SERVER, {Severity, Msg, Params}}).
@@ -176,12 +236,3 @@ defaults() ->
 	[].
 
 
-
-%% ----------------------        ------------------------------
-%%%%%%%%%%%%%%%%%%%%%%%%%  TEST  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% ----------------------        ------------------------------
-
-test() ->
-	Modules=[twitter_app, twitter_log],
-	
-	ok.
