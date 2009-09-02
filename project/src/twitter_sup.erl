@@ -55,7 +55,7 @@ init(_Args) ->
 	Child_snoop = {twitter_snooper,{twitter_snooper, start_link,[]},
 	      permanent,2000,worker,[twitter_snooper]},
 	
-	Child_config = {twitter_config,{twitter_config, start_link,[]},
+	Child_config = {twitter_config,{twitter_config, start_link,[Modules]},
 	      permanent,2000,worker,[twitter_mswitch_config]},
 	
 	

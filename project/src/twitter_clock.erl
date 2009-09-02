@@ -29,6 +29,8 @@
 
 -define(SYNC_PATTERN, [100, 250, 500, 750, 1000, 2000, 3000]).
 
+-define(CTOOLS, twitter_ctools).
+
 
 %%
 %% Exported Functions
@@ -92,6 +94,15 @@ loop() ->
 		stop ->
 			exit(normal);
 		
+		{config, Version, Config} ->
+			put(config.version, Version),
+			?CTOOLS:put_config(Config);
+
+		
+		%%% LOCAL SWITCH RELATED %%%
+		{hwswitch, From, Bus, Msg} ->
+			handle({hwswitch, From, Bus, Msg});
+		
 		{sync, Delay} ->
 			?SWITCH:publish(clock, {tick.sync, Delay}),
 			do_sync();
@@ -133,6 +144,36 @@ do_sync([]) ->
 do_sync([Delay|Tail]) ->
 	timer:send_after(Delay, {sync, Delay}),
 	put(sync_pattern, Tail).
+
+
+%% ----------------------            ------------------------------
+%%%%%%%%%%%%%%%%%%%%%%%%%  HANDLERS  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% ----------------------            ------------------------------
+
+
+
+handle({hwswitch, _From, clock, {tick.min, _Count}}) ->
+	?CTOOLS:do_publish_config_version(?SWITCH, ?SERVER);
+
+handle({hwswitch, _From, clock, {tick.sync, _Count}}) ->
+	?CTOOLS:do_publish_config_version(?SWITCH, ?SERVER);	
+
+handle({hwswitch, _From, clock, _}) ->
+	not_supported;
+
+%% The in-force configuration version is announced
+handle({hwswitch, _From, sys, {config, VersionInForce}}) ->
+	put(config.inforce, VersionInForce),
+	?CTOOLS:do_config(?SWITCH, ?SERVER, VersionInForce);
+
+
+handle({hwswitch, _From, sys, _}) ->
+	not_supported;
+
+
+
+handle(Other) ->
+	log(warning, "Unexpected message: ", [Other]).
 
 
 %% ----------------------          ------------------------------
