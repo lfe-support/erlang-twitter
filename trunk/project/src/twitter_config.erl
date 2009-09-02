@@ -51,7 +51,7 @@
 %% Management Functions
 %%
 -export([
-		 start_link/0
+		 start_link/1
 		 ,stop/0
 		 ,get_server/0
 		 ,get_busses/0
@@ -79,18 +79,15 @@
 get_server() ->	?SERVER.
 get_busses() -> ?BUSSES.
 
-start_link() ->
+start_link(Modules) ->
 	Pid=spawn_link(?MODULE, loop, []),
 	register(?SERVER, Pid),
-	Pid ! start,
+	Pid ! {start, Modules},
 	{ok, Pid}.
 
 stop() ->
-	try 
-		?SERVER ! stop,
-		ok
-	catch
-		_:_ ->	{error, cannot_stop}
+	try  ?SERVER ! stop,	ok
+	catch _:_ ->	{error, cannot_stop}
 	end.
 
 
@@ -102,8 +99,9 @@ loop() ->
 	receive
 		
 		%%% MANAGEMENT RELATED %%%
-		start ->
-			ok;
+		{start, Modules} ->
+			put(modules, Modules),
+			do_load_config();
 		
 		stop ->
 			exit(normal);
@@ -146,11 +144,12 @@ handle(Other) ->
 %% ----------------------         ------------------------------
 
 do_load_config() ->
+	Modules=get(modules),
 	
 	%% erase all process information
 	erase(),
 	
-	Result=?CTOOLS:do_config(),
+	Result=?CTOOLS:do_config(Modules),
 	case Result of
 		{ok, Version, Config} ->
 			put(config, Config),
@@ -174,7 +173,7 @@ send(_ModuleServer, _Module, _ModuleConfigVersion, undefined) ->
 	ok;
 
 send(_ModuleServer, Module, X, X) ->
-	log(debug, "Configuration up-to-date for module: ",[Module]);
+	log(debug, "Config up-to-date, mod:",[Module]);
 
 
 send(ModuleServer, Module, _ModuleConfigVersion, CurrentVersion) ->

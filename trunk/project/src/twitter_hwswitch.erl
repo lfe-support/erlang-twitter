@@ -205,6 +205,12 @@ hpublish2([To|Rest], From, Bus, Msg) ->
 	publish_one(To, From, Bus, Msg),
 	hpublish2(Rest, From, Bus, Msg).
 
+%% translate registered name to a pid()
+%% in order to obliviate sending to self
+publish_one(To, From, Bus, Msg) when is_atom(To) ->
+	ToPid=erlang:whereis(To),
+	%%io:format("publish_one: to[~p] topid[~p]~n",[To, ToPid]),
+	publish_one(ToPid, From, Bus, Msg);
 
 publish_one(X, X, _Bus, _Msg) -> not_to_self;
 	%io:format("publish_one: not to self [~p]~n", [X]);
@@ -288,6 +294,9 @@ kfind(Key, List, Default) ->
 		{Key, Value} ->	{Key, Value}
 	end.
 
+
+is_alive(Pid) when is_pid(Pid) ->
+	erlang:is_process_alive(Pid);
 
 is_alive(Name) ->
 	Pid=erlang:whereis(Name),
