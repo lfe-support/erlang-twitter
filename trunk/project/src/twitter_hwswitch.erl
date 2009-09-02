@@ -59,7 +59,9 @@
 		,get_module_subs/1
 		 ]).
 
+-define(CTOOLS, twitter_ctools).
 -define(SERVER, hwswitch).
+-define(BUSSES, [sys, clock]).
 
 %%
 %% API Functions
@@ -67,7 +69,15 @@
 -export([
 		start_link/2
 		,publish/2, publish/3
+	    ,get_server/0, get_busses/0
 		]).
+
+%% ----------------------              ------------------------------
+%%%%%%%%%%%%%%%%%%%%%%%%%  Management  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% ----------------------              ------------------------------
+get_server() ->	?SERVER.
+get_busses() -> ?BUSSES.
+
 
 %%@doc Starts this server in debug mode
 %% 
@@ -155,7 +165,7 @@ loop(Subs) ->
 	receive
 		stop -> 
 			exit(ok);
-		
+
 		{debug, Debug} ->
 			put(debug, Debug);
 

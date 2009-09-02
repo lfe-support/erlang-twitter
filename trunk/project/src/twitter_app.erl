@@ -128,11 +128,6 @@ handle({hwswitch, _From, clock, {tick.sync, _Count}}) ->
 handle({hwswitch, _From, clock, _}) ->
 	not_supported;
 
-%% The in-force configuration version is announced
-handle({hwswitch, _From, sys, {config, VersionInForce}}) ->
-	put(config.inforce, VersionInForce),
-	check(),
-	?CTOOLS:do_config(?SWITCH, ?SERVER, VersionInForce);
 
 handle({hwswitch, _From, sys, suspend}) ->
 	set_state(suspended);
@@ -140,13 +135,17 @@ handle({hwswitch, _From, sys, suspend}) ->
 handle({hwswitch, _From, sys, resume}) ->
 	set_state(working);
 
+handle({hwswitch, _From, sys, {config, VersionInForce}}) ->
+	put(config.version.inforce, VersionInForce);
+
 
 %% A module advertises its configuration version
 handle({hwswitch, _From, sys, {mod.config, Module, Version}}) ->
 	put({mod.version, Module}, Version),
 	check();
 
-handle({hwswitch, _From, sys, _}) ->
+handle({hwswitch, _From, sys, _Msg}) ->
+	%io:format("app: rx sys msg[~p]~n", [Msg]);
 	not_supported;
 
 
@@ -159,45 +158,38 @@ handle(Other) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%  LOCALS  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% ----------------------          ------------------------------
 
+make_list(List) when is_list(List) -> List;
+make_list(Term) -> [Term].
+
+
 %% @doc Performs a correlation check
 %%
 check() ->
-	Version=get(config.inforce),
-	Modules=get(modules),
-	check(Modules, Version, 1).
+	VersionInForce=get(config.version.inforce),
+	Modules=make_list(get(modules))--[?MODULE],
+	Count=length(Modules),
+	do_check(Modules, VersionInForce, Count, 0).
 
-check([], _, _) ->
-	end_list;
+do_check(_, undefined, _, _) ->
+	config_not_started;
 
-check(_, undefined, _) ->
-	no_version_in_force;
-
-check([Module|Rest], Version, Count) ->
-	ModVersion=get({mod.version, Module}),
-	check_one(Version, ModVersion, Count),
-	check(Rest, Version, Count+1).
-
-
-check_one(Version, ModVersion, Count) ->
-	
-	%% Version match?
-	case Version==ModVersion of
-		true ->
-			maybe_generate_ready(Count);
-		false ->
-			ok
-	end.
-
-maybe_generate_ready(Count) ->
-	TotalCount=get(modules.count),
-	maybe_generate_ready(Count, TotalCount).
-
-%% cycled through all modules and versions match?
-maybe_generate_ready(X, X) ->
+do_check(_, _VersionInForce, X, X) ->
 	?SWITCH:publish(sys, app.ready);
 
-maybe_generate_ready(_, _) ->
-	version_no_match.
+do_check([], _, _, _Count) ->
+	%io:format("APP NOT READY, count[~p]~n", Count),
+	not_ready;
+
+do_check([Module|Modules], VersionInForce, ModulesCount, CurrentCount) ->
+	ModuleServer=?CTOOLS:get_module_server(Module),
+	ModVersion=get({mod.version, ModuleServer}),
+	io:format("do_check: mod[~p] vif[~p] mv[~p] mc[~p] cc[~p]~n", [Module, VersionInForce, ModVersion, ModulesCount, CurrentCount]),
+	case VersionInForce==ModVersion of
+		true  -> NewCount=CurrentCount+1;
+		false -> NewCount=CurrentCount
+	end,
+	do_check(Modules, VersionInForce, ModulesCount, NewCount).
+
 
 
 
@@ -207,13 +199,13 @@ maybe_generate_ready(_, _) ->
 set_state(State) ->
 	put(state, State).
 
-get_state() ->
-	State=get(state),
-	case State of
-		undefined -> working;   %start in 'working' state
-		working   -> working;
-		_         -> suspended
-	end.
+%get_state() ->
+%	State=get(state),
+%	case State of
+%		undefined -> working;   %start in 'working' state
+%		working   -> working;
+%		_         -> suspended
+%	end.
 
 
 %% ----------------------          ------------------------------

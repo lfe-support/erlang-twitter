@@ -128,6 +128,9 @@ handle({hwswitch, _From, sys, reload}) ->
 handle({hwswitch, From, sys, {mod.config, Module, ConfigVersion}}) ->
 	maybe_send_config_to_module(From, Module, ConfigVersion);
 
+handle({hwswitch, _From, sys, _}) ->
+	not_supported;
+
 handle({hwswitch, _From, clock, {tick.min, _Count}}) ->
 	'sys.config'();
 
