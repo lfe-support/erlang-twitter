@@ -724,8 +724,10 @@ put_config(Version, ConfigData) ->
 	put(config.version, Version),
 	put_config(ConfigData).
 
+put_config([]) ->
+	ok;
 	
-put_config({_, ConfigData}) when is_list(ConfigData) ->
+put_config(ConfigData) when is_list(ConfigData) ->
 	[Entry|Entries] = ConfigData,
 	try
 		put_config_one(Entry)

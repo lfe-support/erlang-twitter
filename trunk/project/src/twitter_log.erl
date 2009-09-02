@@ -67,6 +67,7 @@
 		 start_link/0, start_link/1
 		 ,get_server/0, get_busses/0
 		 ,log/1, log/2, log/3
+		 ,close/0
 		 ]).
 
 %%
@@ -176,8 +177,8 @@ handle({hwswitch, _From, sys, {config, VersionInForce}}) ->
 	?CTOOLS:do_config(?SWITCH, ?SERVER, VersionInForce);
 
 handle({hwswitch, _From, sys, app.ready}) ->
-	io:format("log: app ready!!~n");
-	%not_supported;
+	%io:format("log: app ready!!~n");
+	not_supported;
 
 
 handle({hwswitch, _From, sys, _}) ->
@@ -195,7 +196,7 @@ handle({hwswitch, _From, clock, _}) ->
 %% Policer bypass point
 %%
 handle({hwswitch, _From, log, {_Context, {Severity, Msg, Params}}}) ->
-	io:format("log: handle: Msg[~p]~n", [Msg]),
+	%io:format("log: handle: Msg[~p]~n", [Msg]),
 	log_on_bypass(Severity, Msg, Params);
 
 handle({hwswitch, _From, log, _}) ->
@@ -220,7 +221,7 @@ handle(Other) ->
 
 
 should_bypass() ->
-	get(log.policer.bypass).
+	get('log.policer.bypass').
 
 
 log_on_bypass(Sev, Msg, Params) ->
@@ -230,8 +231,8 @@ log_on_bypass(Sev, Msg, Params) ->
 log_on_bypass(true, Sev, Msg, Params) ->
 	log(Sev, Msg, Params);
 
-log_on_bypass(_, _Sev, Msg, _Params) ->
-	io:format("log: bypassed: Msg[~p]~n", [Msg]),
+log_on_bypass(_, _Sev, _Msg, _Params) ->
+	%io:format("log: not_bypassed: Msg[~p]~n", [Msg]),
 	not_bypassed.
 
 
