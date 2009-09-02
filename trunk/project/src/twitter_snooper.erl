@@ -151,7 +151,7 @@ loop() ->
 
 
 subscribe() ->
-	?MSWITCH:subscribe(?MSWITCH_BUSSES).	
+	?MSWITCH:subscribe({twitter_snooper, inbox, ?SERVER}, ?MSWITCH_BUSSES).	
 
 
 %% ----------------------           ------------------------------
