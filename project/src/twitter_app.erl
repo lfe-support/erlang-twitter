@@ -188,7 +188,7 @@ do_check([], _, _, _Count) ->
 do_check([Module|Modules], VersionInForce, ModulesCount, CurrentCount) ->
 	ModuleServer=?CTOOLS:get_module_server(Module),
 	ModVersion=get({mod.version, ModuleServer}),
-	io:format("do_check: mod[~p] vif[~p] mv[~p] mc[~p] cc[~p]~n", [Module, VersionInForce, ModVersion, ModulesCount, CurrentCount]),
+	%io:format("do_check: mod[~p] vif[~p] mv[~p] mc[~p] cc[~p]~n", [Module, VersionInForce, ModVersion, ModulesCount, CurrentCount]),
 	case VersionInForce==ModVersion of
 		true  -> NewCount=CurrentCount+1;
 		false -> NewCount=CurrentCount
