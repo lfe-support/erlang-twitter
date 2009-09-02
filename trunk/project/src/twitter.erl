@@ -18,8 +18,6 @@
 %%
 %% Macros 
 %%
--define(DEFAULTS, twitter_defaults).
--define(POLICER,  twitter_policer).
 -define(SERVER,   twitter).
 -define(TOOLS,    twitter_tools).
 -define(CTOOLS,   twitter_ctools).
@@ -71,7 +69,7 @@ get_busses() -> ?BUSSES.
 %%
 %% @spec start_link() -> {ok, Pid}
 start_link() ->
-	inets:start(),
+	%inets:start(permanent),
 	Pid = spawn_link(?MODULE, loop, []),
 	register(?SERVER, Pid),
 	{ok,Pid}.
@@ -151,6 +149,10 @@ handle({hwswitch, _From, sys, suspend}) ->
 handle({hwswitch, _From, sys, resume}) ->
 	put(state, working);
 
+handle({hwswitch, _From, sys, _}) ->
+	unsupported;
+
+
 handle({hwswitch, _From, sys, {config, VersionInForce}}) ->
 	?CTOOLS:do_config(?SWITCH, ?SERVER, VersionInForce);
 
@@ -160,8 +162,14 @@ handle({hwswitch, _From, clock, {tick.min, _Count}}) ->
 handle({hwswitch, _From, clock, {tick.sync, _Count}}) ->
 	?CTOOLS:do_publish_config_version(?SWITCH, ?SERVER);	
 
+
+%% @TODO
+handle({hwswitch, _From, notif, _}) ->
+	unsupported;
+
+
 handle(Other) ->
-	log(warning, "Unexpected message: ", [Other]).
+	log(warning, "twitter: Unexpected message: ", [Other]).
 
 
 

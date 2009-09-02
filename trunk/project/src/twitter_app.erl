@@ -151,7 +151,7 @@ handle({hwswitch, _From, sys, _Msg}) ->
 
 
 handle(Other) ->
-	log(warning, "Unexpected message: ", [Other]).
+	log(warning, "app: Unexpected message: ", [Other]).
 
 
 %% ----------------------          ------------------------------
