@@ -179,14 +179,23 @@ hpublish([], _From, _Bus, _Msg) ->
 
 hpublish(Subs, From, Bus, Msg) ->
 	%io:format("hpublish: bus[~p] subs[~p] ~n",[Bus, Subs]),
+	Result=kfind(Bus, Subs),
+	maybe_publish(Result, From, Bus, Msg).
+
+
+maybe_publish({}, _From, _Bus, _Msg) ->
+	no_subs;
+	%io:format("hswitch: no subscribers for bus[~p]~n", [Bus]);
+
+maybe_publish({_, ToList}, From, Bus, Msg) ->
 	try
-		{Bus, ToList}=kfind(Bus, Subs),
 		hpublish2(ToList, From, Bus, Msg)
 	catch
 		X:Y ->
-			io:format("hublish exception X[~p] Y[~p]~n", [X,Y]),
+			io:format("hswitch: hpublish exception X[~p] Y[~p]~n", [X,Y]),
 			no_subs
 	end.
+	
 
 
 hpublish2([], _From, _Bus, _Msg) ->
