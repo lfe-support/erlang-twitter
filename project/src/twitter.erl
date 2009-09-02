@@ -223,7 +223,8 @@ blacklist() ->
 %%
 defaults() ->
 	[
-	 {twitter.user, mandatory, nstring, ""}
-	,{twitter.pass, mandatory, nstring, ""}
+	 {twitter.user,     mandatory, nstring, ""}
+	,{twitter.pass,     mandatory, nstring, ""}
+	,{twitter.simulate, optional,  atom,    false}
 	 ].
 
