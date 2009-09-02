@@ -22,7 +22,7 @@
 %% this module sends to the source (and this case 'policer') its configuration information
 %% using the message format:
 %% ```
-%%  {config, Configuration}
+%%  {config, Version, Configuration}
 %% '''
 %%
 %% == Duties ==

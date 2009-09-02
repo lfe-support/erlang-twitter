@@ -705,6 +705,24 @@ get_module_entries(ModuleName, [Entry|Rest], Acc) ->
 	end.
 	
 	
+put_config({_, ConfigData}) when is_list(ConfigData) ->
+	[Entry|Entries] = ConfigData,
+	try
+		put_config_one(Entry)
+	catch 
+		_:_ ->
+			?LOG:log(critical, "put_config: error with Entry: ", [Entry])
+	end,
+	put_config(Entries);
+	
+put_config(_) ->
+	{error, invalid_param}.
+
+
+put_config_one({Param, Value}) ->
+	put(Param, Value).
+
+	
 	
 %% ----------------------        ------------------------------
 %%%%%%%%%%%%%%%%%%%%%%%%%  TEST  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
