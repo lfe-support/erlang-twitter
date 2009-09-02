@@ -474,7 +474,7 @@ get_entry_from_defaults([], _Key) -> {};
 %%
 get_entry_from_defaults([ModuleEntries|Modules], Key) ->
 	{_ModuleName, Entries}=ModuleEntries,
-	%io:format("get_entry_from_defaults: Key[~p] Entries[~p]~n",[Key, Entries]),
+	%io:format("get_entry_from_defaults: Mod[~p] Key[~p] Entries[~p]~n",[ModuleName, Key, Entries]),
 	Entry=?TOOLS:kfind(Key, Entries),
 	case Entry of
 		{} ->
@@ -718,7 +718,12 @@ get_module_entries(ModuleName, [Entry|Rest], Acc) ->
 		true  -> get_module_entries(ModuleName, Rest, Acc++[{ParamName, Value}]);
 		false -> get_module_entries(ModuleName, Rest, Acc)
 	end.
-	
+
+
+put_config(Version, ConfigData) ->
+	put(config.version, Version),
+	put_config(ConfigData).
+
 	
 put_config({_, ConfigData}) when is_list(ConfigData) ->
 	[Entry|Entries] = ConfigData,

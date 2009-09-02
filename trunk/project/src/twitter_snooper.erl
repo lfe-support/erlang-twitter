@@ -92,7 +92,9 @@ blacklist() ->
 %% @spec defaults() -> list()
 %%
 defaults() ->
-	[].
+	[
+	 {snooper.output.block, optional, atom, false}
+	 ].
 
 
 %% ----------------------              ------------------------------
@@ -137,8 +139,8 @@ loop() ->
 			%% @TODO log?
 			ok;
 		
-		{mswitch, From, notif, Message} ->
-			handle({mswitch, From, notif, Message});
+		{mswitch, From, notif, Payload} ->
+			handle({mswitch, From, notif, Payload});
 	
 		%%% LOCAL SWITCH RELATED %%%
 		{hwswitch, From, Bus, Msg} ->
@@ -169,9 +171,12 @@ inbox({FromNode, Server, Bus, Message}) ->
 
 %% @doc Translate mswitch 'notif' born messages
 %%		to the internal switch format.
-handle({mswitch, _From, notif, Message}) ->
+handle({mswitch, _From, notif, {Importance, Msg}}) ->
 	State=get_state(),
-	cond_forward(State, Message);
+	cond_forward(State, Importance, Msg);
+
+handle({mswitch, _From, notif, Other}) ->
+	log(debug, "snooper: unsupported msg on notif bus: ", [Other]);
 
 
 handle({hwswitch, _From, sys, {config, VersionInForce}}) ->
@@ -202,12 +207,19 @@ handle(Other) ->
 
 
 
-cond_forward(working, Msg) ->
-	?SWITCH:publish(notif, Msg);
+cond_forward(working, Importance, Msg) ->
+	BlockState=get(snooper.output.block),
+	maybe_publish(BlockState, Importance, Msg);
 
-cond_forward(_, _Msg) ->
+cond_forward(_, _, _Msg) ->
 	ok.
 
+
+maybe_publish(false, Importance, Msg) ->
+	?SWITCH:publish(notif, {Importance, Msg});
+
+maybe_publish(_, _, _) ->
+	blocked.
 
 
 %% ----------------------          ------------------------------

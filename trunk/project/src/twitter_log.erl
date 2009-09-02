@@ -138,8 +138,7 @@ loop() ->
 		reload -> handle(reload);
 
 		{config, Version, Config} ->
-			put(config.version, Version),
-			?CTOOLS:put_config(Config);
+			?CTOOLS:put_config(Version, Config);
 		
 		
 		%%% LOCAL SWITCH RELATED %%%
@@ -196,6 +195,7 @@ handle({hwswitch, _From, clock, _}) ->
 %% Policer bypass point
 %%
 handle({hwswitch, _From, log, {_Context, {Severity, Msg, Params}}}) ->
+	io:format("log: handle: Msg[~p]~n", [Msg]),
 	log_on_bypass(Severity, Msg, Params);
 
 handle({hwswitch, _From, log, _}) ->
@@ -216,6 +216,24 @@ handle(stop) ->
 %%
 handle(Other) ->
 	io:format("log: unhandled message[~p]~n", [Other]).
+
+
+
+should_bypass() ->
+	get(log.policer.bypass).
+
+
+log_on_bypass(Sev, Msg, Params) ->
+	Bypass=should_bypass(),
+	log_on_bypass(Bypass, Sev, Msg, Params).
+	
+log_on_bypass(true, Sev, Msg, Params) ->
+	log(Sev, Msg, Params);
+
+log_on_bypass(_, _Sev, Msg, _Params) ->
+	io:format("log: bypassed: Msg[~p]~n", [Msg]),
+	not_bypassed.
+
 
 
 
@@ -375,20 +393,6 @@ getvar(_VarName, VarValue, _Default) ->
 	VarValue.
 
 
-
-should_bypass() ->
-	get(log.policer.bypass).
-
-
-log_on_bypass(Sev, Msg, Params) ->
-	Bypass=should_bypass(),
-	log_on_bypass(Bypass, Sev, Msg, Params).
-	
-log_on_bypass(true, Sev, Msg, Params) ->
-	log(Sev, Msg, Params);
-
-log_on_bypass(_, _Sev, _Msg, _Params) ->
-	not_bypassed.
 
 %% ----------------------          ------------------------------
 %%%%%%%%%%%%%%%%%%%%%%%%%  CONFIG  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
