@@ -154,30 +154,18 @@ handle({hwswitch, _From, sys, resume}) ->
 	put(state, working);
 
 handle({hwswitch, _From, sys, {config, VersionInForce}}) ->
-	do_config(VersionInForce);
+	?CTOOLS:do_config(?SWITCH, ?SERVER, VersionInForce);
 
 
 handle({hwswitch, _From, clock, {tick.min, _Count}}) ->
-	do_publish_config_version();
+	?CTOOLS:do_publish_config_version(?SWITCH, ?SERVER);
 
 handle({hwswitch, _From, clock, {tick.sync, _Count}}) ->
-	do_publish_config_version();	
+	?CTOOLS:do_publish_config_version(?SWITCH, ?SERVER);	
 
 handle(Other) ->
 	log(warning, "Unexpected message: ", [Other]).
 
-
-do_publish_config_version() ->
-	Version=get(config.version),
-	?SWITCH:publish(sys, {mod.config, ?SERVER, Version}).
-
-do_config(undefined) -> ok;
-do_config(VersionInForce) ->
-	Version=get(config.version),
-	maybe_ask_for_config(VersionInForce, Version).	
-
-maybe_ask_for_config(X, X) -> ok;
-maybe_ask_for_config(_, _) -> do_publish_config_version().
 
 
 %% ----------------------                   ------------------------------

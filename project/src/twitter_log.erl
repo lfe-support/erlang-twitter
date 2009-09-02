@@ -37,6 +37,11 @@
 %% other processes to easily interface to it.
 -define(SERVER, log).
 
+-define(SWITCH, twitter_hwswitch).
+
+%% Local switch busses
+-define(BUSSES, [log, sys, clock]).
+
 %% Log unique identifier
 -define(DEFAULT_LOG,  loggerid).
 
@@ -53,14 +58,25 @@
 -define(STAT_OPEN_ERROR, error_open_log).
 -define(STAT_LOG_ERROR,  error_log_write).
 
+-define(CTOOLS, twitter_ctools).
+
 %%
 %% API Exported Functions
 %%
 -export([
 		 start_link/0, start_link/1
-		 ,get_server/0
+		 ,get_server/0, get_busses/0
 		 ,log/1, log/2, log/3
 		 ]).
+
+%%
+%% Config Functions
+%%
+-export([
+		 defaults/0,
+		 blacklist/0
+		 ]).
+
 
 %% LOCALS
 -export([
@@ -71,6 +87,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%  API %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% ----------------------      ------------------------------
 get_server() ->	?SERVER.
+get_busses() -> ?BUSSES.
 
 
 %% @doc Default start
@@ -119,6 +136,12 @@ loop() ->
 		
 		stop   -> handle(stop);
 		reload -> handle(reload);
+
+		
+		%%% LOCAL SWITCH RELATED %%%
+		{hwswitch, From, Bus, Msg} ->
+			handle({hwswitch, From, Bus, Msg});
+		
 		
 		%% API message
 		{log, Severity, Msg, Params} -> 
@@ -137,18 +160,32 @@ loop() ->
 %%%%%%%%%%%%%%%%%%%%%%%%% HANDLERS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% ----------------------         ------------------------------
 
+
+handle({hwswitch, _From, sys, {config, VersionInForce}}) ->
+	?CTOOLS:do_config(?SWITCH, ?SERVER, VersionInForce);
+
+handle({hwswitch, _From, clock, {tick.min, _Count}}) ->
+	?CTOOLS:do_publish_config_version(?SWITCH, ?SERVER);
+
+handle({hwswitch, _From, clock, {tick.sync, _Count}}) ->
+	?CTOOLS:do_publish_config_version(?SWITCH, ?SERVER);	
+
+
+handle({hwswitch, _From, sys, reload}) ->
+	ok;
+
+handle({hwswitch, _From, sys, Msg}) ->
+	ok;
+
+
 handle({start, LogName}) ->
 	put(logfilename, LogName),
 	init();
 
 handle(stop) ->
 	close(),
-	exit(ok);
+	exit(normal);
 
-%% @doc Handle 'reload' event
-%%
-handle(reload) ->
-	init();
 
 handle({log, Severity, Msg, Params}) ->
 	log(Severity, Msg, Params);
@@ -313,4 +350,25 @@ getvar(VarName, undefined, Default) ->
 
 getvar(_VarName, VarValue, _Default) ->
 	VarValue.
+
+
+%% ----------------------          ------------------------------
+%%%%%%%%%%%%%%%%%%%%%%%%%  CONFIG  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% ----------------------          ------------------------------
+
+%% @doc List of parameters which cannot be customized
+%%
+%% @spec blacklist() -> list()
+%%
+blacklist() ->
+	[].
+
+%% @doc List of default parameters for the module
+%%
+%% @spec defaults() -> list()
+%%
+defaults() ->
+	[
+	 {log.bypass, optional, atom, false}
+	 ].
 

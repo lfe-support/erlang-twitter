@@ -730,6 +730,19 @@ put_config_one({Param, Value}) ->
 
 	
 
+do_publish_config_version(Switch, Server) ->
+	Version=get(config.version),
+	erlang:apply(Switch, publish, [sys, {mod.config, Server, Version}]).
+
+do_config(_Switch, _Server, undefined) -> ok;
+do_config(Switch, Server, VersionInForce) ->
+	Version=get(config.version),
+	maybe_ask_for_config(Switch, Server, VersionInForce, Version).	
+
+maybe_ask_for_config(_,_, X, X) -> ok;
+maybe_ask_for_config(Switch, Server, _, _) -> do_publish_config_version(Switch, Server).
+
+
 	
 %% ----------------------        ------------------------------
 %%%%%%%%%%%%%%%%%%%%%%%%%  TEST  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
