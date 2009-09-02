@@ -31,6 +31,7 @@
 -define(SERVER, app).
 -define(SWITCH, twitter_hwswitch).
 -define(BUSSES, [sys, clock]).
+-define(CTOOLS, twitter_ctools).
 
 %%
 %% API Functions
@@ -96,6 +97,10 @@ loop() ->
 			put(modules.count, length(Modules)),
 			put(modules, Modules);
 		
+		{config, Version, Config} ->
+			put(config.version, Version),
+			?CTOOLS:put_config(Config);
+		
 		stop ->
 			exit(normal);
 	
@@ -112,22 +117,39 @@ loop() ->
 %%%%%%%%%%%%%%%%%%%%%%%%%  HANDLERS  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% ----------------------            ------------------------------
 
-
-%% A module advertises its configuration version
-handle({hwswitch, From, sys, {mod.config, Version}}) ->
-	put({mod.version, From}, Version),
-	check();
-
-%% The in-force configuration version is announced
-handle({hwswitch, _From, sys, {config, Version}}) ->
-	put(config.version, Version),
-	check();
-	
 handle({hwswitch, _From, clock, {tick.min, _Count}}) ->
-	check();
+	check(),
+	?CTOOLS:do_publish_config_version(?SWITCH, ?SERVER);
 
 handle({hwswitch, _From, clock, {tick.sync, _Count}}) ->
+	check(),
+	?CTOOLS:do_publish_config_version(?SWITCH, ?SERVER);	
+
+handle({hwswitch, _From, clock, _}) ->
+	not_supported;
+
+%% The in-force configuration version is announced
+handle({hwswitch, _From, sys, {config, VersionInForce}}) ->
+	put(config.inforce, VersionInForce),
+	check(),
+	?CTOOLS:do_config(?SWITCH, ?SERVER, VersionInForce);
+
+handle({hwswitch, _From, sys, suspend}) ->
+	set_state(suspended);
+
+handle({hwswitch, _From, sys, resume}) ->
+	set_state(working);
+
+
+%% A module advertises its configuration version
+handle({hwswitch, _From, sys, {mod.config, Module, Version}}) ->
+	put({mod.version, Module}, Version),
 	check();
+
+handle({hwswitch, _From, sys, _}) ->
+	not_supported;
+
+
 
 handle(Other) ->
 	log(warning, "Unexpected message: ", [Other]).
@@ -140,7 +162,7 @@ handle(Other) ->
 %% @doc Performs a correlation check
 %%
 check() ->
-	Version=get(config.version),
+	Version=get(config.inforce),
 	Modules=get(modules),
 	check(Modules, Version, 1).
 
@@ -177,6 +199,21 @@ maybe_generate_ready(X, X) ->
 maybe_generate_ready(_, _) ->
 	version_no_match.
 
+
+
+%% ----------------------          ------------------------------
+%%%%%%%%%%%%%%%%%%%%%%%%%  HELPERS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% ----------------------          ------------------------------
+set_state(State) ->
+	put(state, State).
+
+get_state() ->
+	State=get(state),
+	case State of
+		undefined -> working;   %start in 'working' state
+		working   -> working;
+		_         -> suspended
+	end.
 
 
 %% ----------------------          ------------------------------
