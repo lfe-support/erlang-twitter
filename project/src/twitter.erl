@@ -100,8 +100,7 @@ loop() ->
 			exit(normal);
 		
 		{config, Version, Config} ->
-			put(config.version, Version),
-			?CTOOLS:put_config(Config);
+			?CTOOLS:put_config(Version, Config);
 
 		
 		%%% LOCAL SWITCH RELATED %%%
@@ -156,7 +155,6 @@ handle({hwswitch, _From, sys, resume}) ->
 
 handle({hwswitch, _From, sys, {config, VersionInForce}}) ->
 	?CTOOLS:do_config(?SWITCH, ?SERVER, VersionInForce);
-
 
 handle({hwswitch, _From, clock, {tick.min, _Count}}) ->
 	?CTOOLS:do_publish_config_version(?SWITCH, ?SERVER);
