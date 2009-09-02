@@ -741,8 +741,17 @@ put_config_one({Param, _Level, _Type, Value}) ->
 put_config_one({Param, Value}) ->
 	put(Param, Value).
 
-	
 
+%% ----------------------          ------------------------------
+%%%%%%%%%%%%%%%%%%%%%%%%%  BOILER  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%  PLATE   %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%  FOR     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%  MODULES %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% ----------------------          ------------------------------
+
+
+%% NOTE the process dictionary variable 'config.version'
+%%
 do_publish_config_version(Switch, Server) ->
 	Version=get(config.version),
 	erlang:apply(Switch, publish, [sys, {mod.config, Server, Version}]).
