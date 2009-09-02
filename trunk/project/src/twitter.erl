@@ -24,6 +24,7 @@
 -define(LOGGER,   twitter_log).
 -define(LOG,      twitter_policed_logger).
 -define(TOOLS,    twitter_tools).
+-define(CTOOLS,   twitter_ctools).
 -define(REQ,      twitter_req).
 -define(TAPI,     twitter_api).
 -define(MNG,      twitter_mng).
@@ -75,19 +76,14 @@ start_link() ->
 	inets:start(),
 	Pid = spawn_link(?MODULE, loop, []),
 	register(?SERVER, Pid),
-	?SERVER ! reload,
 	{ok,Pid}.
 
 %% Stop
 %%
 %% @spec stop() -> ok | {error, Reason} 
 stop() ->
-	try
-		?SERVER ! stop,
-		ok
-	catch 
-		_:_ ->
-			{error, cannot_stop}
+	try   ?SERVER ! stop, ok
+	catch _:_ -> {error, cannot_stop}
 	end.
 
 
@@ -102,6 +98,16 @@ loop() ->
 		
 		stop ->
 			exit(normal);
+		
+		{config, Version, Config} ->
+			put(config.version, Version),
+			?CTOOLS:put_config(Config);
+
+		
+		%%% LOCAL SWITCH RELATED %%%
+		{hwswitch, From, Bus, Msg} ->
+			handle({hwswitch, From, Bus, Msg});
+		
 		
 		%% RPC bridge
 		%%
@@ -137,7 +143,41 @@ loop() ->
 	end,
 	loop().
 
+%% ----------------------            ------------------------------
+%%%%%%%%%%%%%%%%%%%%%%%%%  HANDLERS  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% ----------------------            ------------------------------
 
+handle({hwswitch, _From, sys, suspend}) ->
+	put(state, suspended);
+
+handle({hwswitch, _From, sys, resume}) ->
+	put(state, working);
+
+handle({hwswitch, _From, sys, {config, VersionInForce}}) ->
+	do_config(VersionInForce);
+
+
+handle({hwswitch, _From, clock, {tick.min, _Count}}) ->
+	do_publish_config_version();
+
+handle({hwswitch, _From, clock, {tick.sync, _Count}}) ->
+	do_publish_config_version();	
+
+handle(Other) ->
+	log(warning, "Unexpected message: ", [Other]).
+
+
+do_publish_config_version() ->
+	Version=get(config.version),
+	?SWITCH:publish(sys, {mod.config, ?SERVER, Version}).
+
+do_config(undefined) -> ok;
+do_config(VersionInForce) ->
+	Version=get(config.version),
+	maybe_ask_for_config(VersionInForce, Version).	
+
+maybe_ask_for_config(X, X) -> ok;
+maybe_ask_for_config(_, _) -> do_publish_config_version().
 
 
 %% ----------------------                   ------------------------------
