@@ -166,6 +166,11 @@ make_list(Term) -> [Term].
 %%
 check() ->
 	VersionInForce=get(config.version.inforce),
+	
+	%% don't forget to skip self...
+	%% one reason is that we don't receive the message we send
+	%% on the hswitch so 'mod.config' won't get trapped and thus
+	%% we won't get the full picture.
 	Modules=make_list(get(modules))--[?MODULE],
 	Count=length(Modules),
 	do_check(Modules, VersionInForce, Count, 0).
