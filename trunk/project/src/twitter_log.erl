@@ -176,6 +176,11 @@ handle({hwswitch, _From, sys, reload}) ->
 handle({hwswitch, _From, sys, {config, VersionInForce}}) ->
 	?CTOOLS:do_config(?SWITCH, ?SERVER, VersionInForce);
 
+handle({hwswitch, _From, sys, app.ready}) ->
+	io:format("log: app ready!!~n");
+	%not_supported;
+
+
 handle({hwswitch, _From, sys, _}) ->
 	not_supported;
 
