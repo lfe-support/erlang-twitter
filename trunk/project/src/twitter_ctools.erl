@@ -191,8 +191,10 @@ check_type3(Key,  _Ckey, nstring,Cvalue, _Dvalue) when is_list(Cvalue) ->
 	case length(Cvalue) of
 		0 -> ?LOG:log(error, "config: expecting non-zero string for key: ", [Key]),	invalid;
 		_ -> ok
-	end.
+	end;
 
+check_type3(Key, _Ckey, Type, _Cvalue, _Dvalue) -> 
+	?LOG:log(error, "config: expecting Type for Key, {Type, Key}: ", [{Type, Key}]).
 		
 
 
@@ -718,11 +720,16 @@ put_config({_, ConfigData}) when is_list(ConfigData) ->
 put_config(_) ->
 	{error, invalid_param}.
 
+%% For entries from Defaults
+put_config_one({Param, _Level, _Type, Value}) ->
+	put(Param, Value);
 
+%% For entries from Configuration File
 put_config_one({Param, Value}) ->
 	put(Param, Value).
 
 	
+
 	
 %% ----------------------        ------------------------------
 %%%%%%%%%%%%%%%%%%%%%%%%%  TEST  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

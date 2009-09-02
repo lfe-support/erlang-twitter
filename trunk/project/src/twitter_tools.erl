@@ -487,6 +487,23 @@ extract_head2([]) ->
 extract_head2([Head|_Rest]) ->
 	erlang:list_to_atom(Head).
 	
+
+
+extract_tail(Atom) ->
+	extract_tail(Atom, ".").
+
+extract_tail(Atom, SeparatorList) when is_atom(Atom) ->
+	String=erlang:atom_to_list(Atom),
+	Tokens=string:tokens(String, SeparatorList),
+	extract_tail2(Tokens).
+
+extract_tail2([]) ->
+	'';
+
+extract_tail2([_Head|Tail]) ->
+	erlang:list_to_atom(Tail).
+
+
 	
 %% @doc Adds (respecting uniqueness) an Element
 %%		to a specific tuple in a List
