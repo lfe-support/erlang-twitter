@@ -150,7 +150,7 @@ do_load_config() ->
 	Modules=get(modules),
 	
 	%% erase all process information
-	erase(),
+	%erase(),
 	
 	Result=?CTOOLS:do_config(Modules),
 	case Result of

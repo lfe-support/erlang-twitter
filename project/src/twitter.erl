@@ -21,8 +21,6 @@
 -define(DEFAULTS, twitter_defaults).
 -define(POLICER,  twitter_policer).
 -define(SERVER,   twitter).
--define(LOGGER,   twitter_log).
--define(LOG,      twitter_policed_logger).
 -define(TOOLS,    twitter_tools).
 -define(CTOOLS,   twitter_ctools).
 -define(REQ,      twitter_req).
@@ -31,7 +29,7 @@
 -define(RPC,      twitter_rpc).
 
 -define(SWITCH,      twitter_hwswitch).
--define(BUSSES,      [sys, clock]).
+-define(BUSSES,      [sys, clock, notif]).
 -define(TIMER_CHECK, 60*1000).
 
 %%

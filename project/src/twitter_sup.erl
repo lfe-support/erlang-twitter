@@ -37,11 +37,11 @@ init(_Args) ->
 	
 	%% Add all modules here
 	%% List the modules that require HWSWITCH bus access
-	HS_Modules = [twitter_log, twitter_clock, twitter_config, twitter_app, twitter_snooper, twitter_updater, twitter ],
+	HS_Modules = [twitter_log, twitter_clock, twitter_config, twitter_app, twitter_snooper, twitter],
 	
 	%% List the modules that require configuration
 	%%
-	CF_Modules = [twitter_log, twitter_app, twitter_snooper, twitter_updater, twitter ],
+	CF_Modules = [twitter_log, twitter_app, twitter_snooper, twitter ],
 	
 	
     Child_logger = {twitter_log,{twitter_log, start_link,[{logfilename, "/var/log/twitter.log"}]},
@@ -66,7 +66,7 @@ init(_Args) ->
 	      permanent,2000,worker,[twitter]},
 	
 	
-	Children = [Child_logger, Child_switch, Child_clock, Child_app, Child_snoop, Child_config, Child_twitter   ],
+	Children = [Child_logger, Child_switch, Child_clock, Child_app, Child_snoop, Child_config ,Child_twitter   ],
 	
 	
     {ok,{{one_for_one,5,1}, Children }}.
