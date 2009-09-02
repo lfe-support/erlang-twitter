@@ -339,11 +339,19 @@ load_defaults([], Acc) ->
 %%	Modules = [atom()]
 %%
 load_defaults([Module|Modules], Acc) ->
-	Defaults=try_load_module_defaults(Module),
-	%io:format("load_defaults: Module[~p] Defaults[~p]~n",[Module, Defaults]),	
-	List=try_check_defaults(Defaults, []),
-	FilteredList=filter_entries(List, []),
-	load_defaults(Modules, Acc++[{Module, FilteredList}]).
+	Server=get_module_server(Module),
+	case Server of
+		undefined ->
+			?LOG:log(debug, "load_defaults: cannot access 'module server name' for module: ", [Module]),
+			load_defaults(Modules, Acc);
+		ServerName ->
+			Defaults=try_load_module_defaults(Module),
+			%io:format("load_defaults: Module[~p] Defaults[~p]~n",[Module, Defaults]),	
+			List=try_check_defaults(Defaults, []),
+			FilteredList=filter_entries(List, []),
+			load_defaults(Modules, Acc++[{ServerName, FilteredList}])
+	end.
+	
 
 
 try_load_module_defaults(Module) ->
@@ -364,14 +372,19 @@ try_check_defaults([], List) ->
 
 try_check_defaults(Defaults, List) when is_list(Defaults) ->
 	[Default|Rest]=Defaults,
+	
+	%% Entry format 'envelope' check
 	Entry= check1_one_default(Default),
+	
+	%% Entry 'elements' format check
 	E1= check2_one_default(Entry),
+	
+	%% type check
 	E2= check3_one_default(E1),
 	try_check_defaults(Rest, List++[E2]).
 
 
-check1_one_default({}) ->
-	{};
+check1_one_default({}) -> {};
 
 check1_one_default(Default) when is_tuple(Default) ->
 	try
