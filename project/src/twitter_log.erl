@@ -369,6 +369,6 @@ blacklist() ->
 %%
 defaults() ->
 	[
-	 {log.bypass, optional, atom, false}
+	 {log.policer.bypass, optional, atom, false}
 	 ].
 
