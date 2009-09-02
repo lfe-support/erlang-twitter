@@ -13,7 +13,7 @@
 %%  <li>Listen on local 'sys' mswitch for 'reload' event</li>
 %%  <li>Listen on local 'sys' mswitch for 'suspend' event</li>
 %%  <li>Listen on local 'sys' mswitch for 'resume' event</li>
-%%  <li></li>
+%%  <li>Listen for 'clock.tick.min' and 'clock.tick.sync'</li>
 %% </ul>
 %%
 %% == Translation ==
@@ -34,25 +34,6 @@
 %%  <li>notif</li>
 %% </ul>
 %%
-%% == Local Switch Subscriptions ==
-%% The typical 'system' messages will be actioned:
-%% <ul>
-%%  <li>sys: reload, suspend, resume</li>
-%% </ul>
-%% 
-%% === Format ===
-%% ```
-%%	{From, sys, reload}
-%% '''
-%%
-%% ```
-%%	{From, sys, suspend}  and   {From, sys, resume} 
-%% '''
-%%
-%% == Local Switch Publications ==
-%% <ul>
-%%  <li>log</li>
-%% </ul>
 %%
 %% == Configuration ==
 %% None.
@@ -62,9 +43,10 @@
 
 -define(MSWITCH, mswitch).
 -define(SERVER, snooper).
--define(BUSSES, [sys]).
+-define(BUSSES, [sys, clock]).
 -define(SWITCH, twitter_hwswitch).
 -define(MSWITCH_BUSSES, [notif]).
+-define(CTOOLS, twitter_ctools).
 
 %%
 %% Config Functions
@@ -78,7 +60,7 @@
 %% Management Functions
 %%
 -export([
-		 start_link/1
+		 start_link/0
 		 ,stop/0
 		 ,get_server/0
 		 ,get_busses/0
@@ -119,18 +101,15 @@ defaults() ->
 get_server() ->	?SERVER.
 get_busses() -> ?BUSSES.
 
-start_link(_Args) ->
+start_link() ->
 	Pid=spawn_link(?MODULE, loop, []),
 	register(?SERVER, Pid),
 	Pid ! start,
 	{ok, Pid}.
 
 stop() ->
-	try 
-		?SERVER ! stop,
-		ok
-	catch
-		_:_ ->	{error, cannot_stop}
+	try   ?SERVER ! stop, ok
+	catch _:_ ->	{error, cannot_stop}
 	end.
 
 
@@ -148,6 +127,11 @@ loop() ->
 		stop ->
 			exit(normal);
 	
+		{config, Version, Config} ->
+			put(config.version, Version),
+			?CTOOLS:put_config(Config);
+		
+		
 		%%% MSWITCH RELATED %%%
 		{hwswitch.bounce, _Bus, _Msg} ->
 			%% @TODO log?
@@ -189,9 +173,9 @@ handle({mswitch, _From, notif, Message}) ->
 	State=get_state(),
 	cond_forward(State, Message);
 
-%% Not much to do
-handle({hwswitch, _From, sys, reload}) ->
-	ok;
+
+handle({hwswitch, _From, sys, {config, VersionInForce}}) ->
+	?CTOOLS:do_config(?SWITCH, ?SERVER, VersionInForce);
 
 handle({hwswitch, _From, sys, suspend}) ->
 	set_state(suspended);
@@ -199,8 +183,21 @@ handle({hwswitch, _From, sys, suspend}) ->
 handle({hwswitch, _From, sys, resume}) ->
 	set_state(working);
 
+handle({hwswitch, _From, sys, _}) ->
+	not_supported;
+
+handle({hwswitch, _From, clock, {tick.min, _Count}}) ->
+	?CTOOLS:do_publish_config_version(?SWITCH, ?SERVER);
+
+handle({hwswitch, _From, clock, {tick.sync, _Count}}) ->
+	?CTOOLS:do_publish_config_version(?SWITCH, ?SERVER);	
+
+handle({hwswitch, _From, clock, _}) ->
+	not_supported;
+
+
 handle(Other) ->
-	log(warning, "Unexpected message: ", [Other]).
+	log(warning, "snooper: unexpected message: ", [Other]).
 
 
 

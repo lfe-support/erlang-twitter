@@ -51,7 +51,7 @@
 %% Management Functions
 %%
 -export([
-		 start_link/1
+		 start_link/0
 		 ,stop/0
 		 ,get_server/0
 		 ,get_busses/0
@@ -79,7 +79,7 @@
 get_server() ->	?SERVER.
 get_busses() -> ?BUSSES.
 
-start_link(_Args) ->
+start_link() ->
 	Pid=spawn_link(?MODULE, loop, []),
 	register(?SERVER, Pid),
 	Pid ! start,
