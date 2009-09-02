@@ -137,6 +137,10 @@ loop() ->
 		stop   -> handle(stop);
 		reload -> handle(reload);
 
+		{config, Version, Config} ->
+			put(config.version, Version),
+			?CTOOLS:put_config(Config);
+		
 		
 		%%% LOCAL SWITCH RELATED %%%
 		{hwswitch, From, Bus, Msg} ->
@@ -160,9 +164,20 @@ loop() ->
 %%%%%%%%%%%%%%%%%%%%%%%%% HANDLERS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% ----------------------         ------------------------------
 
+%% Handler for direct communication
+%% Normal API when using e.g. policer
+%%
+handle({log, Severity, Msg, Params}) ->
+	log(Severity, Msg, Params);
+
+handle({hwswitch, _From, sys, reload}) ->
+	ok;
 
 handle({hwswitch, _From, sys, {config, VersionInForce}}) ->
 	?CTOOLS:do_config(?SWITCH, ?SERVER, VersionInForce);
+
+handle({hwswitch, _From, sys, _}) ->
+	not_supported;
 
 handle({hwswitch, _From, clock, {tick.min, _Count}}) ->
 	?CTOOLS:do_publish_config_version(?SWITCH, ?SERVER);
@@ -170,12 +185,16 @@ handle({hwswitch, _From, clock, {tick.min, _Count}}) ->
 handle({hwswitch, _From, clock, {tick.sync, _Count}}) ->
 	?CTOOLS:do_publish_config_version(?SWITCH, ?SERVER);	
 
+handle({hwswitch, _From, clock, _}) ->
+	not_supported;
 
-handle({hwswitch, _From, sys, reload}) ->
-	ok;
+%% Policer bypass point
+%%
+handle({hwswitch, _From, log, {_Context, {Severity, Msg, Params}}}) ->
+	log_on_bypass(Severity, Msg, Params);
 
-handle({hwswitch, _From, sys, Msg}) ->
-	ok;
+handle({hwswitch, _From, log, _}) ->
+	not_supported;
 
 
 handle({start, LogName}) ->
@@ -187,13 +206,12 @@ handle(stop) ->
 	exit(normal);
 
 
-handle({log, Severity, Msg, Params}) ->
-	log(Severity, Msg, Params);
 
 %% @doc Exception... not much can be done...
 %%
-handle(_) ->
-	ok.
+handle(Other) ->
+	io:format("log: unhandled message[~p]~n", [Other]).
+
 
 
 
@@ -351,6 +369,21 @@ getvar(VarName, undefined, Default) ->
 getvar(_VarName, VarValue, _Default) ->
 	VarValue.
 
+
+
+should_bypass() ->
+	get(log.policer.bypass).
+
+
+log_on_bypass(Sev, Msg, Params) ->
+	Bypass=should_bypass(),
+	log_on_bypass(Bypass, Sev, Msg, Params).
+	
+log_on_bypass(true, Sev, Msg, Params) ->
+	log(Sev, Msg, Params);
+
+log_on_bypass(_, _Sev, _Msg, _Params) ->
+	not_bypassed.
 
 %% ----------------------          ------------------------------
 %%%%%%%%%%%%%%%%%%%%%%%%%  CONFIG  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
