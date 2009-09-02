@@ -119,7 +119,7 @@ handle({hwswitch, _From, notif, {Importance, Msg}}) ->
 
 
 handle(Other) ->
-	log(warning, "Unexpected message: ", [Other]).
+	log(warning, "updater: Unexpected message: ", [Other]).
 
 
 %% ----------------------          ------------------------------

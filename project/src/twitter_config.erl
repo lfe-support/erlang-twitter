@@ -112,7 +112,7 @@ loop() ->
 			handle({hwswitch, From, Bus, Msg});
 	
 		Other ->
-			log(warning, "Unexpected message: ", [Other])
+			log(warning, "config: Unexpected message: ", [Other])
 	end,
 	loop().
 
@@ -138,7 +138,7 @@ handle({hwswitch, _From, clock, {tick.sync, _Count}}) ->
 	'sys.config'();	
 
 handle(Other) ->
-	log(warning, "Unexpected message: ", [Other]).
+	log(warning, "config: Unexpected message: ", [Other]).
 
 
 
