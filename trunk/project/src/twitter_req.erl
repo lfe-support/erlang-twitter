@@ -69,6 +69,7 @@ do_request(ReturnDetails, Timeout, Req, Headers) ->
 do_request(Type, ReturnDetails, Timeout, Req, Headers) ->
 	CompleteReq=?API++Req,
 	Ret = http:request(Type, {CompleteReq, Headers}, [{timeout, Timeout}], [{sync, false}]),
+	io:format("do_request: ret[~p]~n", [Ret]),
 	case Ret of
 
 		%% Response will be messaged
@@ -83,6 +84,7 @@ do_request(Type, ReturnDetails, Timeout, Req, Headers) ->
 do_request(Type, ReturnDetails, Timeout, Req, Headers, ContentType, Body) ->
 	CompleteReq=?API++Req,
 	Ret = http:request(Type, {CompleteReq, Headers, ContentType, Body}, [{timeout, Timeout}], [{sync, false}]),
+	io:format("do_request: ret[~p]~n", [Ret]),
 	case Ret of
 
 		{ok, RequestId} ->

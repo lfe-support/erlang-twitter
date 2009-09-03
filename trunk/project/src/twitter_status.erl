@@ -54,9 +54,9 @@ get_busses() -> ?BUSSES.
 
 
 start_link() ->
-	inets:start(httpc, []),
 	Pid=spawn_link(?MODULE, loop, []),
 	register(?SERVER, Pid),
+	Pid ! start,
 	{ok, Pid}.
 
 
@@ -71,6 +71,10 @@ stop() ->
 %% ----------------------         ------------------------------
 loop() ->
 	receive
+		
+		start ->
+			%% start in the process' context
+			inets:start(httpc, []);
 		
 		{timer, Aid} ->
 			do_status(Aid);
@@ -108,6 +112,10 @@ loop() ->
 			ReturnDetails=get({requestid, RequestId}),
 			erase({requestid, RequestId}),
 			process_result(ReturnDetails, Result);
+		
+		
+		{{Aid, 'account.rate_limit_status'}, Msg} ->
+			io:format("status: receive for aid[~p] msg[~p]~n", [Aid, Msg]);
 		
 		
 		Other ->
@@ -221,7 +229,7 @@ do_status(Aid) ->
 	do_status(Aid, Ad).
 
 do_status(Aid, {User, Pass}) ->
-	Rd={Aid, 'account.rate_limit_status'},
+	Rd={self(), {request, Aid, 'account.rate_limit_status'}},
 	?API:request(Rd, ?TIMEOUT, {auth, User, Pass}, account.rate_limit_status, [], []);
 
 
