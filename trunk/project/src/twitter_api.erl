@@ -87,7 +87,6 @@ request(Rd, TO, Auth, statuses.user_timeline, [], []) ->
 
 %% @private
 request(Rd, TO, Auth, statuses.user_timeline, [], OpParams) when is_list(OpParams) ->
-	io:format("(A)~n",[]),
 	?REQ:doreq(Rd, TO, Auth, get, "statuses/user_timeline.xml", [], OpParams);
 
 %% @private

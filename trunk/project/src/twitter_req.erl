@@ -100,4 +100,8 @@ reply(undefined, Message) ->
 
 %% @private
 reply({From, Context}, Message) ->
-	From ! {Context, Message}.
+	try
+		From ! {Context, Message}
+	catch _:_ -> error
+	end.
+
