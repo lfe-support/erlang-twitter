@@ -7,12 +7,15 @@
 %% Use twitter_tools:extract to retrieve a specific field
 %%  of the result-set returned by twitter_api:request
 %%
-%% Daemon:
-%%  - reads configuration file in ~/.twitter
-%%  - can reload the configuration file
-%%  - status of mswitch subscription
-%%  - 
-
+%% @doc
+%% == Operation ==
+%%
+%% 1) Upon 'app.ready' message reception, 
+%%    parse config for 'twitter.account*' parameters
+%%    and send on 'tweet' bus
+%%
+%% 
+%%
 -module(twitter).
 
 %%
@@ -158,6 +161,12 @@ handle({hwswitch, _From, clock, {tick.min, _Count}}) ->
 handle({hwswitch, _From, clock, {tick.sync, _Count}}) ->
 	?CTOOLS:do_publish_config_version(?SWITCH, ?SERVER);	
 
+handle({hwswitch, _From, sys, app.ready}) ->
+	Accounts=get_accounts(),
+	?SWITCH:publish(tweet, {accounts, Accounts});
+	%io:format("accounts: ~p~n",[Accounts]);
+
+
 handle({hwswitch, _From, sys, _}) ->
 	unsupported;
 
@@ -185,6 +194,45 @@ daemon_api(ReplyContext, Command) ->
 			?MNG:inc_stat(error_daemon_api_invalid_command),
 			{error, invalid_command}
 	end.
+
+
+%% ----------------------           ------------------------------
+%%%%%%%%%%%%%%%%%%%%%%%%%  HELPERS  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% ----------------------           ------------------------------
+
+%% @doc Go through the process dictionary and make a list
+%%		from the variables 'twitter.account*'
+get_accounts() ->
+	do_get_accounts(1, []).
+
+do_get_accounts(Count, Acc) ->
+	Account=?TOOLS:make_atom_from_list([twitter,'.','account',Count]),
+	{State, NewAcc}=try_one_var(Count, Account, Acc),
+	case State of
+		finished -> NewAcc;
+		found    ->
+			do_get_accounts(Count+1, NewAcc)
+	end.
+
+	
+try_one_var(AccountId, Account, Acc) ->
+	User=?TOOLS:make_atom_from_list([Account,'.user']),
+	Pass=?TOOLS:make_atom_from_list([Account,'.pass']),
+	%io:format("try: u[~p] p[~p]~n", [User, Pass]),
+	UserVar=get(User),
+	PassVar=get(Pass),
+	maybe_add(AccountId, UserVar, PassVar, Acc).
+
+
+
+maybe_add(_, _, undefined, Acc) ->
+	{finished, Acc};
+
+maybe_add(_, undefined, _, Acc) ->
+	{finished, Acc};
+
+maybe_add(AccountId, UserValue, PassValue, Acc) ->
+	{found, Acc++[{AccountId, UserValue, PassValue}]}.	
 
 
 
