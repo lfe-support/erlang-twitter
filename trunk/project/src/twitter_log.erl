@@ -81,7 +81,7 @@
 
 %% LOCALS
 -export([
-		 loop/0
+		 loop/1
 		 ]).
 
 %% ----------------------      ------------------------------
@@ -121,9 +121,8 @@ start_link(Other) ->
 
 %% @private
 run(Server, LogName) ->
-	Pid=spawn_link(?MODULE, loop, []),
+	Pid=spawn_link(?MODULE, loop, [LogName]),
 	register(Server, Pid),
-	Pid ! {start, LogName},
 	{ok, Pid}.
 
 
@@ -132,7 +131,7 @@ run(Server, LogName) ->
 %% ----------------------             ------------------------------
 
 %% @private
-loop() ->
+loop(LogName) ->
 	receive
 		
 		stop   -> handle(stop);
@@ -157,7 +156,7 @@ loop() ->
 		Other -> 
 			handle({log, critical, "logger: unhandled message: ", [Other]}) 
 	end,
-	loop().
+	loop(LogName).
 
 
 %% ----------------------          ------------------------------
