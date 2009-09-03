@@ -198,74 +198,6 @@ check_type3(Key, _Ckey, Type, _Cvalue, _Dvalue) ->
 		
 
 
-check_limits([], _Defaults, Acc) ->
-	Acc;
-
-check_limits([ConfigEntry|Entries], Defaults, Acc) ->
-	Entry=check_limit_one(ConfigEntry, Defaults),
-	check_limits(Entries, Defaults, Acc++[Entry]).
-
-
-
-check_limit_one({Key, Value}, Defaults) ->
-	case has_pattern(['.min', '.max'], Key) of
-		false -> {Key, Value};
-		true  ->
-			MinResult=get_min(Defaults, Key),
-			MaxResult=get_max(Defaults, Key),
-			check_limit_one2({Key, Value}, MinResult, MaxResult)
-	end;
-
-%% shouldn't get here...
-check_limit_one(_, _Defaults) ->
-	ok.
-
-check_limit_one2({Key, Value}, {}, {}) ->
-	?LOG:log(debug, "config: missing 'min' default for key: ", [Key]), 
-	?LOG:log(debug, "config: missing 'max' default for key: ", [Key]),
-	{Key, Value};
-
-check_limit_one2({Key, Value}, Result, {}) ->
-	Limit=get_value(Result),
-	?LOG:log(debug, "config: missing 'max' default for key: ", [Key]),
-	check_limit(min, {Key, Value}, Limit);
-
-check_limit_one2({Key, Value}, {}, Result) ->
-	Limit=get_value(Result),
-	?LOG:log(debug, "config: missing 'min' default for key: ", [Key]),
-	check_limit(max, {Key, Value}, Limit);
-
-
-check_limit_one2({Key, Value}, MinResult, MaxResult) ->
-	MinV=get_value(MinResult),
-	MaxV=get_value(MaxResult),
-	{K1, V1}=check_limit(min, {Key, Value}, MinV),
-	check_limit(max, {K1, V1}, MaxV).
-
-
-
-
-check_limit(max, {Key, Value}, Limit) when (is_integer(Value) or is_float(Value)) 
-  											and (is_integer(Limit) or is_float(Limit)) ->
-	case Value > Limit of
-		true ->	?LOG:log(error, "config: value 'too big' for key: ", [Key]), 
-				{Key, Limit};
-		false->	{Key, Value}
-	end;
-
-
-check_limit(min, {Key, Value}, Limit) when (is_integer(Value) or is_float(Value)) 
-  											and (is_integer(Limit) or is_float(Limit)) ->
-	case Value < Limit of
-		true ->	?LOG:log(error, "config: value 'too low' for key: ", [Key]), 
-				{Key, Limit};
-		false->	{Key, Value}
-	end;
-
-check_limit(_, {Key, _Value}, Limit) ->
-	?LOG:log(error, "config: invalid default value for {Key, DefaultValue}: ", [Key, Limit]).
-
-
 
 
 
@@ -599,6 +531,7 @@ get_special(List, Pattern, Key) when is_atom(Pattern) ->
 	get_special(List, Pat, Key);
 
 get_special(List, Pattern, Key) when is_list(Pattern) ->
+	io:format("get_special: Key[~p] List[~p]~n", [Key, List]),
 	Var=erlang:atom_to_list(Key)++Pattern,
 	Vara=erlang:list_to_atom(Var),
 	?TOOLS:kfind(Vara, List).
@@ -770,6 +703,113 @@ do_config(Switch, Server, VersionInForce) ->
 
 maybe_ask_for_config(_,_, X, X) -> ok;
 maybe_ask_for_config(Switch, Server, _, _) -> do_publish_config_version(Switch, Server).
+
+
+
+
+%% ----------------------         ------------------------------
+%%%%%%%%%%%%%%%%%%%%%%%%%  LIMITS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% ----------------------         ------------------------------
+
+
+
+check_limits([], _Defaults, Acc) ->
+	Acc;
+
+check_limits([ConfigEntry|Entries], Defaults, Acc) ->
+	Entry=check_limit_one(ConfigEntry, Defaults),
+	check_limits(Entries, Defaults, Acc++[Entry]).
+
+
+
+check_limit_one({Key, Value}, Defaults) ->
+	Default=get_var_in_defaults(Key, Defaults),
+	case Default of 
+		undefined ->
+			?LOG:log(debug, "config: missing default for key: ", [Key]);
+		{{_, Entries}, {_, _Level, int, _Default}} ->
+			MinResult=get_min(Entries, Key),
+			MaxResult=get_max(Entries, Key),
+			check_limit_one2({Key, Value}, MinResult, MaxResult);
+		{{_, Entries}, {_, _Level, float, _Default}} ->
+			MinResult=get_min(Entries, Key),
+			MaxResult=get_max(Entries, Key),
+			check_limit_one2({Key, Value}, MinResult, MaxResult);
+		_ ->
+			type_without_limit_check
+	end;			
+	
+
+%% shouldn't get here...
+check_limit_one(_, _Defaults) ->
+	ok.
+
+check_limit_one2({Key, Value}, {}, {}) ->
+	?LOG:log(debug, "config: missing 'min' default for key: ", [Key]), 
+	?LOG:log(debug, "config: missing 'max' default for key: ", [Key]),
+	{Key, Value};
+
+check_limit_one2({Key, Value}, Result, {}) ->
+	Limit=get_value(Result),
+	?LOG:log(debug, "config: missing 'max' default for key: ", [Key]),
+	check_limit(min, {Key, Value}, Limit);
+
+check_limit_one2({Key, Value}, {}, Result) ->
+	Limit=get_value(Result),
+	?LOG:log(debug, "config: missing 'min' default for key: ", [Key]),
+	check_limit(max, {Key, Value}, Limit);
+
+
+check_limit_one2({Key, Value}, MinResult, MaxResult) ->
+	MinV=get_value(MinResult),
+	MaxV=get_value(MaxResult),
+	{K1, V1}=check_limit(min, {Key, Value}, MinV),
+	check_limit(max, {K1, V1}, MaxV).
+
+
+
+
+check_limit(max, {Key, Value}, Limit) when (is_integer(Value) or is_float(Value)) 
+  											and (is_integer(Limit) or is_float(Limit)) ->
+	case Value > Limit of
+		true ->	?LOG:log(error, "config: value 'too big' for key: ", [Key]), 
+				{Key, Limit};
+		false->	{Key, Value}
+	end;
+
+
+check_limit(min, {Key, Value}, Limit) when (is_integer(Value) or is_float(Value)) 
+  											and (is_integer(Limit) or is_float(Limit)) ->
+	case Value < Limit of
+		true ->	?LOG:log(error, "config: value 'too low' for key: ", [Key]), 
+				{Key, Limit};
+		false->	{Key, Value}
+	end;
+
+check_limit(_, {Key, _Value}, Limit) ->
+	?LOG:log(error, "config: invalid default value for {Key, DefaultValue}: ", [[Key, Limit]]).
+
+
+
+%% @doc Retrieves a specific entry in the Defaults list
+%%
+%% @spec get_var_in_defaults(VarName, Defaults) -> undefined | {[ModuleEntries], Entry}
+%% where
+%%	@type ModuleEntries=[tuple()]
+%%	@type Entry=tuple()
+%%
+get_var_in_defaults(VarName, Defaults) ->
+	ModuleName=?TOOLS:extract_head(VarName),
+	ModuleEntries=?TOOLS:kfind(ModuleName, Defaults),
+	case ModuleEntries of
+		{} -> undefined;
+		{_, Entries} ->
+			{ModuleEntries, ?TOOLS:kfind(VarName, Entries)}
+	end.
+
+
+
+
 
 
 	
