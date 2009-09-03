@@ -7,10 +7,14 @@
 %% ==Twitter Status==
 %%
 %% <ul>
-%%  <li>Listen on 'tweet' bus for 'tweet.account' messages</li>
+%%  <li>Listen on 'tweet' bus for 'tweet.accounts' messages</li>
 %%  <li>Send status updates using 'tweet.status' messages</li>
 %%  <li></li>
 %% </ul>
+%%
+%% == Operation ==
+%%
+%% For each account, 
 -module(twitter_status).
 
 -define(SERVER, status).
@@ -85,6 +89,9 @@ loop() ->
 %% ----------------------            ------------------------------
 
 
+%%%%%%%%%%%%%% CLOCK bus %%%%%%%%%%%%%%%%%%%%%%%%
+
+
 handle({hwswitch, _From, clock, {tick.min, _Count}}) ->
 	?CTOOLS:do_publish_config_version(?SWITCH, ?SERVER);
 
@@ -93,6 +100,8 @@ handle({hwswitch, _From, clock, {tick.sync, _Count}}) ->
 
 handle({hwswitch, _From, clock, _}) ->
 	not_supported;
+
+%%%%%%%%%%%%%% SYS bus %%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 handle({hwswitch, _From, sys, {config, VersionInForce}}) ->
 	?CTOOLS:do_config(?SWITCH, ?SERVER, VersionInForce);
@@ -104,12 +113,23 @@ handle({hwswitch, _From, sys, suspend}) ->
 handle({hwswitch, _From, sys, resume}) ->
 	set_state(working);
 
-
 handle({hwswitch, _From, sys, _Msg}) ->
 	%io:format("app: rx sys msg[~p]~n", [Msg]);
 	not_supported;
 
+%%%%%%%%%%%%%% TWEET bus %%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+handle({hwswitch, _From, tweet, {accounts, Accounts}  }) ->
+	put(accounts, Accounts);
+
+
+handle({hwswitch, _From, tweet, _  }) ->
+	unsupported;
+
+
+
+%%%%%%%%%%%%%%%%%%% --- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%% --- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
 handle(Other) ->
