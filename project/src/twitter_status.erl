@@ -4,18 +4,18 @@
 %%
 %% @doc 
 %%
-%% ==Twitter Updater==
+%% ==Twitter Status==
 %%
 %% <ul>
-%%  <li>Listen on 'notif' bus</li>
-%%  <li>Sends update on 'tweet' bus</li>
+%%  <li>Listen on 'tweet' bus for 'tweet.account' messages</li>
+%%  <li>Send status updates using 'tweet.status' messages</li>
 %%  <li></li>
 %% </ul>
--module(twitter_updater).
+-module(twitter_status).
 
--define(SERVER, updater).
+-define(SERVER, status).
 -define(SWITCH, twitter_hwswitch).
--define(BUSSES, [notif, sys, clock]).
+-define(BUSSES, [sys, clock, tweet]).
 -define(CTOOLS, twitter_ctools).
 
 %%
@@ -52,11 +52,8 @@ start_link() ->
 
 
 stop() ->
-	try 
-		?SERVER ! stop,
-		ok
-	catch
-		_:_ ->	{error, cannot_stop}
+	try ?SERVER ! stop, ok
+	catch _:_ -> {error, cannot_stop}
 	end.
 
 
@@ -67,8 +64,8 @@ loop() ->
 	receive
 			
 		{config, Version, Config} ->
-			put(config.version, Version),
-			?CTOOLS:put_config(Config);
+			io:format("status:configdata: ~p~n", [Config]),
+			?CTOOLS:put_config(Version, Config);
 		
 		stop ->
 			exit(normal);
@@ -113,13 +110,10 @@ handle({hwswitch, _From, sys, _Msg}) ->
 	not_supported;
 
 
-handle({hwswitch, _From, notif, {Importance, Msg}}) ->
-	ok;
-
 
 
 handle(Other) ->
-	log(warning, "updater: Unexpected message: ", [Other]).
+	log(warning, "status: Unexpected message: ", [Other]).
 
 
 %% ----------------------          ------------------------------
@@ -165,6 +159,8 @@ blacklist() ->
 %%
 defaults() ->
 	[
-	 
+	  {status.poll,     optional, int, 5*60*1000}  %% in milliseconds
+	 ,{status.poll.min, optional, int, 1*60*1000}  %% in milliseconds
+	 ,{status.poll.max, optional, int, 15*60*1000} %% in milliseconds
 	 ].
 
