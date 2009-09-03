@@ -179,6 +179,7 @@ do_check(_, undefined, _, _) ->
 	config_not_started;
 
 do_check(_, _VersionInForce, X, X) ->
+	clog(app.ready, info, "application ready"),
 	?SWITCH:publish(sys, app.ready);
 
 do_check([], _, _, _Count) ->
@@ -222,6 +223,12 @@ set_state(State) ->
 
 log(Severity, Msg, Params) ->
 	?SWITCH:publish(log, {?SERVER, {Severity, Msg, Params}}).
+
+clog(Ctx, Sev, Msg) ->
+	?SWITCH:publish(log, {Ctx, {Sev, Msg, []}}).
+
+clog(Ctx, Sev, Msg, Ps) ->
+	?SWITCH:publish(log, {Ctx, {Sev, Msg, Ps}}).
 
 %% ----------------------          ------------------------------
 %%%%%%%%%%%%%%%%%%%%%%%%%  CONFIG  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
