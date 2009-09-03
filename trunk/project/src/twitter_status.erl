@@ -64,7 +64,7 @@ loop() ->
 	receive
 			
 		{config, Version, Config} ->
-			io:format("status:configdata: ~p~n", [Config]),
+			%io:format("status:configdata: ~p~n", [Config]),
 			?CTOOLS:put_config(Version, Config);
 		
 		stop ->

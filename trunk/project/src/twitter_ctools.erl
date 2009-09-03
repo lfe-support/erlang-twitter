@@ -371,29 +371,6 @@ check3_one_default({Key, Level, Type, Value}) when Type==atom ->
 
 
 
-filter_entries([], Acc)           -> Acc;
-filter_entries([[]|Rest], Acc)    -> filter_entries(Rest, Acc);
-filter_entries([{}|Rest], Acc)    -> filter_entries(Rest, Acc);
-filter_entries([Entry|Rest], Acc) -> filter_entries(Rest, Acc++[Entry]).
-
-
-%% @doc Retrieves the Key field from an Entry (defaults format)
-%% 
-%% @spec get_key(Entry) -> Key
-%% where 
-%%	Entry = {Key, Level, Type, Value}
-%%	Key = atom()
-get_key({Key, _Level, _Type, _Value}) -> {key, Key};
-get_key(_) -> error.
-
-get_level({_Key, Level, _Type, _Value}) -> {level, Level};
-get_level(_) ->	error.
-
-get_type({_Key, _Level, Type, _Value}) -> {type, Type};
-get_type(_) -> error.
-
-get_value({_Key, _Level, _Type, Value}) -> {value, Value};
-get_value(_) -> error.
 
 
 
@@ -605,6 +582,8 @@ do_merge([], Acc) ->
 	Acc;
 
 do_merge([ConfigEntry|ConfigEntries], Acc) ->
+	%io:format("do_merge: ce[~p]~n", [ConfigEntry]),
+	
 	try
 		{ParamName, Value}=ConfigEntry,
 		%io:format("do_merge: param[~p] value[~p]~n",[ParamName, Value]),
@@ -616,7 +595,10 @@ do_merge([ConfigEntry|ConfigEntries], Acc) ->
 		_:_ ->
 			?LOG:log(error, "config: error whilst merging defaults+config"),
 			{error, merging}
-	end.
+	end;
+
+do_merge(Other, _) ->
+	?LOG:log(critial, "config: exception whilst merging: ", [Other]).
 
 
 insert_entry(ModuleName, ParamName, Value, List) ->
@@ -738,7 +720,8 @@ check_limit_one({Key, Value}, Defaults) ->
 			%io:format("check_limit_one2: key[~p] val[~p] min[~p] max[~p]~n", [Key, Value, MinResult, MaxResult]),
 			check_limit_one2({Key, Value}, MinResult, MaxResult);
 		_ ->
-			type_without_limit_check
+			type_without_limit_check,
+			{Key, Value}
 	end;			
 	
 
@@ -775,7 +758,7 @@ check_limit_one2({Key, Value}, MinResult, MaxResult) ->
 check_limit(max, {Key, Value}, {_, Limit}) when (is_integer(Value) or is_float(Value)) 
   											and (is_integer(Limit) or is_float(Limit)) ->
 	case Value > Limit of
-		true ->	?LOG:log(error, "config: value 'too big' for key: ", [Key]), 
+		true ->	?LOG:log(error, "config: value 'too high' {Key, Value, MaxValue} ", [Key, Value, Limit]), 
 				{Key, Limit};
 		false->	{Key, Value}
 	end;
@@ -784,7 +767,7 @@ check_limit(max, {Key, Value}, {_, Limit}) when (is_integer(Value) or is_float(V
 check_limit(min, {Key, Value}, {_, Limit}) when (is_integer(Value) or is_float(Value)) 
   											and (is_integer(Limit) or is_float(Limit)) ->
 	case Value < Limit of
-		true ->	?LOG:log(error, "config: value 'too low' for key: ", [Key]), 
+		true ->	?LOG:log(error, "config: value 'too low' {Key, Value, MinValue} ", [Key, Value, Limit]), 
 				{Key, Limit};
 		false->	{Key, Value}
 	end;
@@ -813,6 +796,29 @@ get_var_in_defaults(VarName, Defaults) ->
 
 
 
+filter_entries([], Acc)           -> Acc;
+filter_entries([[]|Rest], Acc)    -> filter_entries(Rest, Acc);
+filter_entries([{}|Rest], Acc)    -> filter_entries(Rest, Acc);
+filter_entries([Entry|Rest], Acc) -> filter_entries(Rest, Acc++[Entry]).
+
+
+%% @doc Retrieves the Key field from an Entry (defaults format)
+%% 
+%% @spec get_key(Entry) -> Key
+%% where 
+%%	Entry = {Key, Level, Type, Value}
+%%	Key = atom()
+get_key({Key, _Level, _Type, _Value}) -> {key, Key};
+get_key(_) -> error.
+
+get_level({_Key, Level, _Type, _Value}) -> {level, Level};
+get_level(_) ->	error.
+
+get_type({_Key, _Level, Type, _Value}) -> {type, Type};
+get_type(_) -> error.
+
+get_value({_Key, _Level, _Type, Value}) -> {value, Value};
+get_value(_) -> error.
 
 
 
