@@ -149,10 +149,6 @@ handle({hwswitch, _From, sys, suspend}) ->
 handle({hwswitch, _From, sys, resume}) ->
 	put(state, working);
 
-handle({hwswitch, _From, sys, _}) ->
-	unsupported;
-
-
 handle({hwswitch, _From, sys, {config, VersionInForce}}) ->
 	?CTOOLS:do_config(?SWITCH, ?SERVER, VersionInForce);
 
@@ -161,6 +157,9 @@ handle({hwswitch, _From, clock, {tick.min, _Count}}) ->
 
 handle({hwswitch, _From, clock, {tick.sync, _Count}}) ->
 	?CTOOLS:do_publish_config_version(?SWITCH, ?SERVER);	
+
+handle({hwswitch, _From, sys, _}) ->
+	unsupported;
 
 
 %% @TODO
@@ -216,8 +215,10 @@ blacklist() ->
 %%
 defaults() ->
 	[
-	 {twitter.user,     mandatory, nstring, ""}
-	,{twitter.pass,     mandatory, nstring, ""}
-	,{twitter.simulate, optional,  atom,    false}
+	 %% prepare for possible 'load balancing'
+	 {twitter.account1.user, mandatory, nstring,  ""}
+	,{twitter.account1.pass, mandatory, nstring,  ""}
+	
+	,{twitter.simulate,      optional,  atom,     false}
 	 ].
 
