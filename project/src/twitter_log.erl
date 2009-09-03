@@ -82,6 +82,7 @@
 %% LOCALS
 -export([
 		 loop/1
+		,init/1
 		 ]).
 
 %% ----------------------      ------------------------------
@@ -121,8 +122,10 @@ start_link(Other) ->
 
 %% @private
 run(Server, LogName) ->
+	init(LogName),
 	Pid=spawn_link(?MODULE, loop, [LogName]),
 	register(Server, Pid),
+	Pid ! {start, LogName},
 	{ok, Pid}.
 
 
@@ -204,7 +207,7 @@ handle({hwswitch, _From, log, _}) ->
 
 handle({start, LogName}) ->
 	put(logfilename, LogName),
-	init();
+	init(LogName);
 
 handle(stop) ->
 	close(),
@@ -251,14 +254,7 @@ log_on_bypass(_, _Sev, _Msg, _Params) ->
 %% - opens the specified log
 %% - sets the process variables
 %%
-init() ->
-	CurrentLog=get(log),
-	
-	%% ignore return code
-	_Ret=?LOG:close(CurrentLog),
-	
-	LogFileName=get(logfilename),
-	
+init(LogFileName) ->
 	%% opens the log...
 	Params=[
 		{name,    ?DEFAULT_LOG}
@@ -272,7 +268,7 @@ init() ->
 	],
 	Ret2=?LOG:open(Params),
 	process_open(Ret2),
-	%%io:format("Log:init: completed~n"),
+	%io:format("Log:init: completed, ret[~p]~n", [Ret2]),
 	Ret2.
 
 %% @doc Records log open errors
@@ -281,7 +277,7 @@ process_open({error, _Reason}) ->
 	inc_stat(?STAT_OPEN_ERROR);
 
 process_open({ok, Log}) ->
-	%%io:format("process_open: log: ~p~n", [Log]),
+	%io:format("process_open: log: ~p~n", [Log]),
 	put(log, Log);
 
 process_open({repaired, Log, _}) ->
@@ -314,6 +310,7 @@ log(Severity, Msg) ->
 %%
 log(Severity, Msg, Params) ->
 	Logger=get(log),
+	io:format("log: logger[~p]~n", [Logger]),
 	dolog(Severity, Logger, Msg, Params).
 
 dolog(Severity, undefined, Msg, []) ->
