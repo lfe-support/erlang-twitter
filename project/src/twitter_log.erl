@@ -50,7 +50,7 @@
 -define(BUSSES, [log, sys, clock]).
 
 %% Log unique identifier
--define(DEFAULT_LOG,  loggerid).
+-define(DEFAULT_LOG,  twitter).
 
 %% Default dir (*nix)
 -define(DEFAULT_DIR,  "/var/log/").

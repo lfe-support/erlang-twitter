@@ -12,15 +12,19 @@
 %%  <li></li>
 %% </ul>
 %%
-%% == Operation ==
+%% == Logging Contexts ==
 %%
-%% For each account, 
+%% {twitter.status,request, Aid}
+%%
 -module(twitter_status).
 
--define(SERVER, status).
--define(SWITCH, twitter_hwswitch).
--define(BUSSES, [sys, clock, tweet]).
--define(CTOOLS, twitter_ctools).
+-define(SERVER,  status).
+-define(SWITCH,  twitter_hwswitch).
+-define(BUSSES,  [sys, clock, tweet]).
+-define(CTOOLS,  twitter_ctools).
+-define(REQ,     twitter_req).
+-define(API,     twitter_api).
+-define(TIMEOUT, 5*1000).
 
 %%
 %% API Exported Functions
@@ -50,6 +54,7 @@ get_busses() -> ?BUSSES.
 
 
 start_link() ->
+	inets:start(httpc, []),
 	Pid=spawn_link(?MODULE, loop, []),
 	register(?SERVER, Pid),
 	{ok, Pid}.
@@ -81,11 +86,50 @@ loop() ->
 		%%% LOCAL SWITCH RELATED %%%
 		{hwswitch, From, Bus, Msg} ->
 			handle({hwswitch, From, Bus, Msg});
-	
+
+		
+		%%%%%%%%%%% REPLY FROM TWITTER API %%%%%%%%%%%%%%%%%%%
+		%%%%%%%%%%%                        %%%%%%%%%%%%%%%%%%%
+		
+		
+		{http, {RequestId, {error, Reason}}} ->
+			ReturnDetails=get({requestid, RequestId}),
+			erase({requestid, RequestId}),
+			report_error(ReturnDetails, Reason);
+			
+
+		%% Result = {{HttpVersion, HttpCode, HttpResponseCode}, [Headers], ResponseBody}
+		%% HttpVersion = string()         (eg. "HTTP/1.1")
+		%% HttpCode = integer()           (eg. "200")
+		%% HttpResponseCode = string()    (eg. "OK")
+		%% Headers = {key, value}, {key, value} ...
+		%% ResponseBody = string()
+		{http, {RequestId, Result}} ->
+			ReturnDetails=get({requestid, RequestId}),
+			erase({requestid, RequestId}),
+			process_result(ReturnDetails, Result);
+		
+		
 		Other ->
 			log(warning, "updater: unexpected message: ", [Other])
 	end,
 	loop().
+
+
+%% ----------------------            ------------------------------
+%%%%%%%%%%%%%%%%%%%%%%%%%  PROCESS   %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%  RESULTS   %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% ----------------------            ------------------------------
+
+
+report_error(ReturnDetails, Reason) ->
+	{Aid, _Req} = ReturnDetails,
+	log({twitter.status,request, Aid}, error, "status: request to Twitter failed, {AccountId, Reason}: ", [Aid, Reason]).
+
+
+process_result(_ReturnDetails, Result) ->
+	io:format("status: reply: ~p~n", Result),
+	ok.
 
 
 %% ----------------------            ------------------------------
@@ -150,7 +194,12 @@ handle(Other) ->
 %%		status polling for each.
 %%
 sync(Accounts) when is_list(Accounts)->
-	do_sync(Accounts).
+	do_sync(Accounts);
+
+sync(Other) ->
+	log(critical, "status: sync: ", [Other]).
+
+do_sync([]) ->	finished;
 
 do_sync([Account|Accounts]) ->
 	sync1(Account),
@@ -166,10 +215,26 @@ sync1(Other) ->
 
 
 
+% request(Rd, TO, Auth, account.rate_limit_status, [], [])
+do_status(Aid) ->
+	Ad=get({account, Aid}),
+	do_status(Aid, Ad).
+
+do_status(Aid, {User, Pass}) ->
+	Rd={Aid, 'account.rate_limit_status'},
+	?API:request(Rd, ?TIMEOUT, {auth, User, Pass}, account.rate_limit_status, [], []);
+
+
+do_status(Aid, Other) ->
+	log(critical, "status: invalid account details {AccountId, Details} ", [Aid, Other]).
+
+
+
+
 
 manage_timer(Aid) ->
-	TRef=get({timer, Aid}),
-	timer:cancel(TRef),
+	OTRef=get({timer, Aid}),
+	timer:cancel(OTRef),
 	
 	Poll=get_poll(),
 	{ok, TRef}=timer:send_interval(Poll, {timer, Aid}),
@@ -186,10 +251,6 @@ get_poll() ->
 		Other     -> Other
 	end.
 
-
-
-do_status(Aid) ->
-	ok.
 
 
 
@@ -213,11 +274,13 @@ set_state(State) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%  LOGGER  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% ----------------------          ------------------------------
 
-%%log(Severity, Msg) ->
-%%	log(Severity, Msg, []).
+%%log(Severity, Msg) ->	log(Severity, Msg, []).
 
 log(Severity, Msg, Params) ->
 	?SWITCH:publish(log, {?SERVER, {Severity, Msg, Params}}).
+
+log(Ctx, Severity, Msg, Params) ->
+	?SWITCH:publish(log, {Ctx, {Severity, Msg, Params}}).
 
 
 %% ----------------------          ------------------------------
