@@ -730,10 +730,12 @@ check_limit_one({Key, Value}, Defaults) ->
 		{{_, Entries}, {_, _Level, int, _Default}} ->
 			MinResult=get_min(Entries, Key),
 			MaxResult=get_max(Entries, Key),
+			%io:format("check_limit_one2: key[~p] val[~p] min[~p] max[~p]~n", [Key, Value, MinResult, MaxResult]),
 			check_limit_one2({Key, Value}, MinResult, MaxResult);
 		{{_, Entries}, {_, _Level, float, _Default}} ->
 			MinResult=get_min(Entries, Key),
 			MaxResult=get_max(Entries, Key),
+			%io:format("check_limit_one2: key[~p] val[~p] min[~p] max[~p]~n", [Key, Value, MinResult, MaxResult]),
 			check_limit_one2({Key, Value}, MinResult, MaxResult);
 		_ ->
 			type_without_limit_check
@@ -763,13 +765,14 @@ check_limit_one2({Key, Value}, {}, Result) ->
 check_limit_one2({Key, Value}, MinResult, MaxResult) ->
 	MinV=get_value(MinResult),
 	MaxV=get_value(MaxResult),
+	%io:format("check_limit_one2: minv[~p] maxv[~p]~n", [MinV, MaxV]),
 	{K1, V1}=check_limit(min, {Key, Value}, MinV),
 	check_limit(max, {K1, V1}, MaxV).
 
 
 
 
-check_limit(max, {Key, Value}, Limit) when (is_integer(Value) or is_float(Value)) 
+check_limit(max, {Key, Value}, {_, Limit}) when (is_integer(Value) or is_float(Value)) 
   											and (is_integer(Limit) or is_float(Limit)) ->
 	case Value > Limit of
 		true ->	?LOG:log(error, "config: value 'too big' for key: ", [Key]), 
@@ -778,7 +781,7 @@ check_limit(max, {Key, Value}, Limit) when (is_integer(Value) or is_float(Value)
 	end;
 
 
-check_limit(min, {Key, Value}, Limit) when (is_integer(Value) or is_float(Value)) 
+check_limit(min, {Key, Value}, {_, Limit}) when (is_integer(Value) or is_float(Value)) 
   											and (is_integer(Limit) or is_float(Limit)) ->
 	case Value < Limit of
 		true ->	?LOG:log(error, "config: value 'too low' for key: ", [Key]), 
@@ -787,7 +790,8 @@ check_limit(min, {Key, Value}, Limit) when (is_integer(Value) or is_float(Value)
 	end;
 
 check_limit(_, {Key, _Value}, Limit) ->
-	?LOG:log(error, "config: invalid default value for {Key, DefaultValue}: ", [[Key, Limit]]).
+	?LOG:log(error, "config: invalid default value for {Key, DefaultValue}: ", [[Key, Limit]]),
+	{Key, Limit}.
 
 
 
