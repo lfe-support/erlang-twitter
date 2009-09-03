@@ -148,6 +148,9 @@ loop(LogName) ->
 		{hwswitch, From, Bus, Msg} ->
 			handle({hwswitch, From, Bus, Msg});
 		
+		{dolog, Severity, Msg, Params} ->
+			dolog(Severity, Msg, Params);
+		
 		
 		%% API message
 		{log, Severity, Msg, Params} -> 
@@ -287,17 +290,24 @@ process_open(_) ->
 	inc_stat(?STAT_OPEN_ERROR).
 
 
+safe_send(Severity, Msg, Params) ->
+	try
+		?SERVER ! {dolog, Severity, Msg, Params}, ok
+	catch
+		_:_ -> error
+	end.
+
+
+
 %% @doc Log a message with 'info' severity
 %%
 log(Msg) ->
-	Logger=get(log),
-	dolog(info, Logger, Msg, []).
+	safe_send(info, Msg, []).
 
 %% @doc Log a message with specific severity
 %%
 log(Severity, Msg) ->
-	Logger=get(log),
-	dolog(Severity, Logger, Msg, []).
+	safe_send(Severity, Msg, []).	
 
 %% @doc Log a message with specific severity
 %%		and append Params to Msg
@@ -309,9 +319,13 @@ log(Severity, Msg) ->
 %%	Params = [atom() | string()]
 %%
 log(Severity, Msg, Params) ->
+	safe_send(Severity, Msg, Params).
+
+
+dolog(Severity, Msg, Params) ->
 	Logger=get(log),
-	io:format("log: logger[~p]~n", [Logger]),
 	dolog(Severity, Logger, Msg, Params).
+
 
 dolog(Severity, undefined, Msg, []) ->
 	{{Year,Month,Day},{Hour,Min,Sec}} = calendar:now_to_datetime(erlang:now()),
