@@ -66,7 +66,11 @@ stop() ->
 %% ----------------------         ------------------------------
 loop() ->
 	receive
-			
+		
+		{timer, Aid} ->
+			do_status(Aid);
+		
+		
 		{config, Version, Config} ->
 			%io:format("status:configdata: ~p~n", [Config]),
 			?CTOOLS:put_config(Version, Config);
@@ -120,7 +124,8 @@ handle({hwswitch, _From, sys, _Msg}) ->
 %%%%%%%%%%%%%% TWEET bus %%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 handle({hwswitch, _From, tweet, {accounts, Accounts}  }) ->
-	put(accounts, Accounts);
+	put(accounts, Accounts),
+	sync(Accounts);
 
 
 handle({hwswitch, _From, tweet, _  }) ->
@@ -134,6 +139,59 @@ handle({hwswitch, _From, tweet, _  }) ->
 
 handle(Other) ->
 	log(warning, "status: Unexpected message: ", [Other]).
+
+
+
+%% ----------------------        ------------------------------
+%%%%%%%%%%%%%%%%%%%%%%%%%  SYNC  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% ----------------------        ------------------------------
+
+%% @doc Go through the accounts list and start (restart)
+%%		status polling for each.
+%%
+sync(Accounts) when is_list(Accounts)->
+	do_sync(Accounts).
+
+do_sync([Account|Accounts]) ->
+	sync1(Account),
+	do_sync(Accounts).
+
+sync1({Id, User, Pass}) ->
+	put({account, Id}, {User, Pass}),
+	manage_timer(Id);
+
+
+sync1(Other) ->
+	log(debug, "status: invalid account: ", [Other]).
+
+
+
+
+manage_timer(Aid) ->
+	TRef=get({timer, Aid}),
+	timer:cancel(TRef),
+	
+	Poll=get_poll(),
+	{ok, TRef}=timer:send_interval(Poll, {timer, Aid}),
+	put({timer, Aid}, TRef),
+	?SERVER ! {timer, Aid}.
+
+	
+
+get_poll() ->
+	Poll=get('status.poll'),
+	case Poll of
+		% just in case
+		undefined -> 5*60*1000;
+		Other     -> Other
+	end.
+
+
+
+do_status(Aid) ->
+	ok.
+
+
 
 
 %% ----------------------          ------------------------------
