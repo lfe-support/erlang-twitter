@@ -531,7 +531,7 @@ get_special(List, Pattern, Key) when is_atom(Pattern) ->
 	get_special(List, Pat, Key);
 
 get_special(List, Pattern, Key) when is_list(Pattern) ->
-	io:format("get_special: Key[~p] List[~p]~n", [Key, List]),
+	%%io:format("get_special: Key[~p] List[~p]~n", [Key, List]),
 	Var=erlang:atom_to_list(Key)++Pattern,
 	Vara=erlang:list_to_atom(Var),
 	?TOOLS:kfind(Vara, List).
