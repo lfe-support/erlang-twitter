@@ -23,6 +23,7 @@ start_link() ->
 	start_link([]).
 
 start_link(Args) ->
+	inets:start(),
 	process_flag(trap_exit, true),
 	supervisor:start_link({local, ?MODULE}, ?MODULE, Args).
 
