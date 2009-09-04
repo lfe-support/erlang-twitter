@@ -137,10 +137,20 @@ report_error(ReturnDetails, Reason) ->
 	log({twitter.status,request, Aid}, error, "status: request to Twitter failed, {AccountId, Reason}: ", [[Aid, Reason]]).
 
 
-process_result(_ReturnDetails, Result) ->
+process_result({Aid, _}, Result) ->
 	PrResult=?REP:process(Result),
-	io:format("status: reply: ~p~n", [PrResult]),
-	ok.
+	%io:format("status: reply: ~p~n", [PrResult]),
+	maybe_publish_result(Aid, PrResult);
+
+process_result(Rd, _) ->
+	log(critical, "status: process_result exception, Rd: ", [Rd]).
+	
+
+maybe_publish_result(_Aid, {error, _}) ->	error;
+
+maybe_publish_result(Aid, PrResult) ->
+	%io:format("status: publish_result: aid[~p] result:~p~n", [Aid, PrResult]),
+	?SWITCH:publish(tweet, {status, Aid, PrResult}).
 
 
 %% ----------------------            ------------------------------
@@ -232,7 +242,7 @@ do_status(Aid) ->
 	do_status(Aid, Ad).
 
 do_status(Aid, {User, Pass}) ->
-	Rd={self(), {request, Aid, 'account.rate_limit_status'}},
+	Rd={Aid, 'account.rate_limit_status'},
 	?API:request(Rd, ?TIMEOUT, {auth, User, Pass}, account.rate_limit_status, [], []);
 
 
