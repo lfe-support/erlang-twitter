@@ -154,9 +154,6 @@ dorpc(Context, Message) ->
 	end.
 
 
-extract_host() -> 
-	extract_host(node()).
-
 extract_host(Node) when is_atom(Node) -> 
 	extract_host(atom_to_list(Node));
 
