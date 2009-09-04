@@ -40,7 +40,7 @@ cwd     = os.getcwd()
 
 print "%s: postinst: command[%s] configured version [%s] this version[%s]" % (this_lib, command, version, this_version)
 
-upd="update-rc.d etwitter start 20 2 3 4 5 . stop 0 1 6 ."
+upd="update-rc.d twitter start 20 2 3 4 5 . stop 0 1 6 ."
 
 # Update the rcX.d directories
 # ============================
