@@ -55,7 +55,6 @@ get_busses() -> ?BUSSES.
 
 
 start_link() ->
-	%inets:start(),
 	Pid=spawn_link(?MODULE, loop, []),
 	register(?SERVER, Pid),
 	Pid ! start,

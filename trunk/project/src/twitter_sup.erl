@@ -23,7 +23,7 @@ start_link() ->
 	start_link([]).
 
 start_link(Args) ->
-	ResultI=inets:start(),
+	%ResultI=inets:start(),
 	process_flag(trap_exit, true),
 	ResultS=supervisor:start_link({local, ?MODULE}, ?MODULE, Args),
 	%io:format("Results: i<~p> s<~p>~n", [ResultI, ResultS]),
@@ -49,6 +49,7 @@ init(_Args) ->
 	%%
 	CF_Modules = [twitter_log, twitter_logpolicer, twitter_appctl, twitter_snooper, twitter, twitter_status, twitter_updater ],
 	
+    %Child_inets = {inets,{inets, start,[]}, permanent,2000,worker,[inets]},
 	
     Child_logger = {twitter_log,{twitter_log, start_link,[{logfilename, "/var/log/twitter.log"}]},
 	      permanent,2000,worker,[twitter_log]},
