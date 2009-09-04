@@ -56,8 +56,8 @@ if (command == 'remove') or (command == 'purge'):
 	code=  proc.wait()
 	
 	# remove symlinks
-	slinks = [ "/usr/bin/etwitter",
-			   "/usr/bin/etwitter_control",
+	slinks = [ "/usr/bin/twitter",
+			   "/usr/bin/twitter_control",
 			]
 	
 	for link in slinks:

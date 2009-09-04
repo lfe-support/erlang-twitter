@@ -50,8 +50,8 @@ code = proc.wait()
 # Update symlink from /usr/bin to /etc/init.d
 # ===========================================
 slinks = [
-			{"dst":"/usr/bin/etwitter",         "src": "/etc/init.d/etwitter"},
-			{"dst":"/usr/bin/etwitter_control", "src": "/etc/init.d/etwitter_control"}
+			{"dst":"/usr/bin/twitter",         "src": "/etc/init.d/twitter"},
+			{"dst":"/usr/bin/twitter_control", "src": "/etc/init.d/twitter_control"}
 			]
 			
 for link in slinks:
