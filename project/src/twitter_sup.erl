@@ -23,9 +23,13 @@ start_link() ->
 	start_link([]).
 
 start_link(Args) ->
-	inets:start(),
+	ResultI=inets:start(),
 	process_flag(trap_exit, true),
-	supervisor:start_link({local, ?MODULE}, ?MODULE, Args).
+	ResultS=supervisor:start_link({local, ?MODULE}, ?MODULE, Args),
+	%io:format("Results: i<~p> s<~p>~n", [ResultI, ResultS]),
+	ResultS.
+
+		
 
 %% --------------------------------------------------------------------
 %% Func: init/1
@@ -38,12 +42,12 @@ init(_Args) ->
 	
 	%% Add all modules here
 	%% List the modules that require HWSWITCH bus access
-	HS_Modules = [twitter_log, twitter_logpolicer, twitter_clock, twitter_config, twitter_app, twitter_snooper, 
+	HS_Modules = [twitter_log, twitter_logpolicer, twitter_clock, twitter_config, twitter_appctl, twitter_snooper, 
 				  twitter, twitter_status, twitter_updater],
 	
 	%% List the modules that require configuration
 	%%
-	CF_Modules = [twitter_log, twitter_logpolicer, twitter_app, twitter_snooper, twitter, twitter_status, twitter_updater ],
+	CF_Modules = [twitter_log, twitter_logpolicer, twitter_appctl, twitter_snooper, twitter, twitter_status, twitter_updater ],
 	
 	
     Child_logger = {twitter_log,{twitter_log, start_link,[{logfilename, "/var/log/twitter.log"}]},
@@ -58,8 +62,8 @@ init(_Args) ->
     Child_clock = {twitter_clock,{twitter_clock, start_link,[]},
 	      permanent,2000,worker,[twitter_clock]},
 
-	Child_app = {twitter_app,{twitter_app, start_link,[CF_Modules]},
-	      permanent,2000,worker,[twitter_app]},
+	Child_app = {twitter_appctl,{twitter_appctl, start_link,[CF_Modules]},
+	      permanent,2000,worker,[twitter_appctl]},
 
 	Child_snoop = {twitter_snooper,{twitter_snooper, start_link,[]},
 	      permanent,2000,worker,[twitter_snooper]},

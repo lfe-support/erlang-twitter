@@ -1,0 +1,154 @@
+#!/usr/bin/env escript
+%% -*- erlang -*-
+%%! -sname etwitter_control
+%%
+%% @author Jean-Lou Dupont
+%%
+
+%% Customize here
+name()  -> "twitter".
+nnode() -> "twitter".
+%% ^^^^^^^^^^^^^^^^^
+
+cmds() -> "[status|stop|getcmds]".
+
+code_ok()               -> 0.
+code_error()            -> 1.
+code_daemon_found()     -> 2.
+code_daemon_not_found() -> 3.
+code_lib_not_found()    -> 4.
+code_node_not_found()   -> 5.
+
+
+err_lib()      -> name()++" library not found".
+err_daemon()   -> "daemon not found".
+err_node()     -> name()++" node not found".
+err_response() -> "invalid response.".
+
+msg_result() -> "Result: ".
+msg_usage()  -> "usage: "++name()++"_control [-q] "++cmds().
+msg_kill()   -> "stop command sent".
+
+	
+main([]) ->
+	msg(verbose, code_ok(), msg_usage()),
+	halt(code_ok());
+
+main(["-q", Cmd])-> trun(quiet,   Cmd);
+main([Cmd])      ->	trun(verbose, Cmd).
+
+
+trun(Feedback, Cmd) ->
+	%%for development
+	add_cwd(),
+	run(Feedback, erlang:list_to_atom(Cmd)).
+	
+
+run(Feedback, stop) ->
+	Response = makerpc(pid, status),
+	Pid = handle(Feedback, Response, pid),
+	os:cmd("kill -9 "++Pid),
+	msg(Feedback, code_ok(), msg_kill());
+	
+	
+run(Feedback, Cmd) ->
+	Response = makerpc(Cmd, Cmd),
+	Result = handle(Feedback, Response, Cmd),
+	%%io:format("Result: ~p~n",[Result]).
+	msg(Feedback, code_daemon_found(), msg_result(), Result).
+
+	
+
+handle(Feedback, Code, Context) ->
+	case Code of
+		daemon_not_found ->
+			msg(Feedback, code_daemon_not_found(), err_daemon());
+					
+		{error, lib_not_found} ->
+			msg(Feedback, code_lib_not_found(), err_lib());
+			
+		{error, node_not_found} ->
+			msg(Feedback, code_node_not_found(), err_node());
+
+		{Context, Message} ->
+			Message;	
+			
+		Other ->
+			io:format("Other: ~p~n", [Other]),
+			msg(Feedback, code_error(), err_response())
+	end.
+
+
+
+add_cwd() ->
+	{ok,Cwd}=file:get_cwd(),
+	Cp=Cwd++"/ebin",
+	code:add_pathsa([Cp]).
+
+
+msg(Feedback, Code, Msg) ->
+	case Feedback of 
+		verbose ->
+			io:format(name()++"_control: ~s~n", [Msg]);
+		_ ->
+			ok
+	end,	
+	halt(Code).
+
+msg(Feedback, Code, Msg1, Msg2) -> 
+	case Feedback of 
+		verbose ->
+			io:format(name()++"_control: ~s~p~n", [Msg1, Msg2]);
+		_ ->
+			ok
+	end,	
+	halt(Code).
+
+
+
+
+%%%%%%%%%%%%%%	
+%% RPC related
+%%%%%%%%%%%%%%
+
+makerpc(Context, Command) ->
+	try
+		Reply=rpc(Context, Command),
+		case Reply of
+			rpcerror ->
+				{error, daemon_not_found};
+				
+			{Context, Message} ->
+				{Context, Message}
+		end
+	catch
+		error:undef ->
+			{error, lib_not_found};
+		
+		_X:_Y ->
+			%%io:format("X[~p] Y[~p]~n",[X,Y]),
+			{error, node_not_found}
+	end.
+
+rpc(Context, Command) ->
+	case dorpc(Context, Command) of
+		rpcerror ->
+			daemon_not_found;
+	
+		Response ->
+			Response
+	end.
+	
+
+
+dorpc(Context, Message) ->
+	Atom=erlang:list_to_atom(nnode()),
+	Node=tools:make_node(Atom),
+	
+	case rpc:call(Node, Atom, daemon_api, [Context, Message], 2000) of
+		{badrpc, _Reason} ->
+			rpcerror;
+		
+		Other ->
+			Other
+	end.
