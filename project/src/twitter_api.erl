@@ -107,7 +107,7 @@ request(Rd, _TO, _Auth, statuses.update, _Params, _OpParams) ->
 %%
 %% @private
 request(Rd, TO, Auth, account.rate_limit_status, [], []) ->
-	?REQ:doreq(Rd, TO, Auth, post, "account/rate_limit_status.xml", [], []);
+	?REQ:doreq(Rd, TO, Auth, get, "account/rate_limit_status.xml", [], []);
 
 request(Rd, _TO, _Auth, account.rate_limit_status, _M, _O) ->
 	?REQ:reply(Rd, {method_error, account.rate_limit_status});

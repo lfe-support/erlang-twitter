@@ -74,7 +74,7 @@ loop() ->
 		
 		start ->
 			%% start in the process' context
-			inets:start(httpc, []);
+			inets:start(httpc, [{profile, ?SERVER}]);
 		
 		{timer, Aid} ->
 			do_status(Aid);
@@ -132,11 +132,11 @@ loop() ->
 
 report_error(ReturnDetails, Reason) ->
 	{Aid, _Req} = ReturnDetails,
-	log({twitter.status,request, Aid}, error, "status: request to Twitter failed, {AccountId, Reason}: ", [Aid, Reason]).
+	log({twitter.status,request, Aid}, error, "status: request to Twitter failed, {AccountId, Reason}: ", [[Aid, Reason]]).
 
 
 process_result(_ReturnDetails, Result) ->
-	io:format("status: reply: ~p~n", Result),
+	io:format("status: reply: ~p~n", [Result]),
 	ok.
 
 
