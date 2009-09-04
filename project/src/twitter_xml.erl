@@ -38,7 +38,8 @@ equal(_,_) ->
 %%
 get_element_name(Element) ->
 	try
-		Element#xmlElement.name
+		Name=Element#xmlElement.name,
+		{name, Name}
 	catch _:_ -> {error, name_not_found}
 	end.
 
