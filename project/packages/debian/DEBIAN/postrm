@@ -52,7 +52,7 @@ print "%s: postrm: cmd[%s] version[%s]" % (this_lib, command, version)
 # ====================================
 if (command == 'remove') or (command == 'purge'):
 
-	proc = subprocess.Popen("update-rc.d etwitter remove", shell=True)
+	proc = subprocess.Popen("update-rc.d twitter remove", shell=True)
 	code=  proc.wait()
 	
 	# remove symlinks
