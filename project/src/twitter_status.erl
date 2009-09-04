@@ -24,6 +24,7 @@
 -define(CTOOLS,  twitter_ctools).
 -define(REQ,     twitter_req).
 -define(API,     twitter_api).
+-define(REP,     twitter_response).
 -define(TIMEOUT, 5*1000).
 
 %%
@@ -137,7 +138,8 @@ report_error(ReturnDetails, Reason) ->
 
 
 process_result(_ReturnDetails, Result) ->
-	io:format("status: reply: ~p~n", [Result]),
+	PrResult=?REP:process(Result),
+	io:format("status: reply: ~p~n", [PrResult]),
 	ok.
 
 

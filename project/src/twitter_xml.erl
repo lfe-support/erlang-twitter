@@ -33,6 +33,17 @@ equal(X, X) ->
 equal(_,_) ->
 	false.
 
+
+%% @doc Retrieves the 'name' of the element
+%%
+get_element_name(Element) ->
+	try
+		Element#xmlElement.name
+	catch _:_ -> {error, name_not_found}
+	end.
+
+	
+
 %% Retrieves a specific Attribute member
 %% from a list of attributes
 %%
@@ -108,10 +119,10 @@ extractvalue(Attr) ->
 %% @private
 getvalue(Elements) when is_list(Elements) ->
 	[First|Rest] = Elements,
-	Value=getvalue(First),
-	package_result(Value, value, Rest);
+	Value=get_element_value(First),
+	package_result(Value, value, Rest).
 
-getvalue(Element) ->
+get_element_value(Element) ->
 	try
 		[TextNode]=Element#xmlElement.content,
 		Value=TextNode#xmlText.value,
@@ -139,11 +150,13 @@ package_result(Result, Wrapper, Rest) ->
 
 test1() ->
 	{elements, Elements}=process('account.rate_limit_status'()),
-	%%[Element|_Rest]=Elements,
+	[Element|_Rest]=Elements,
 	%%io:format("First: ~p~n",[Element]),
+	Name=get_element_name(Element),
+	io:format("Element name: ~p~n", [Name]),
 	Value=getattrvalue(Elements, type),
 	io:format("Value: ~p~n",[Value]),
-	Content=getvalue(Elements),
+	Content=get_element_value(Elements),
 	io:format("Content: ~p~n",[Content]).
 
 
