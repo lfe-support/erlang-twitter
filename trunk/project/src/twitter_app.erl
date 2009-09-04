@@ -243,8 +243,8 @@ log(Severity, Msg, Params) ->
 clog(Ctx, Sev, Msg) ->
 	?SWITCH:publish(log, {Ctx, {Sev, Msg, []}}).
 
-clog(Ctx, Sev, Msg, Ps) ->
-	?SWITCH:publish(log, {Ctx, {Sev, Msg, Ps}}).
+%clog(Ctx, Sev, Msg, Ps) ->
+%	?SWITCH:publish(log, {Ctx, {Sev, Msg, Ps}}).
 
 %% ----------------------          ------------------------------
 %%%%%%%%%%%%%%%%%%%%%%%%%  CONFIG  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
