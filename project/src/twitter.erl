@@ -59,6 +59,7 @@
 -export([
 		 loop/0
 		,test/0
+		,reload/0
 		 ]).
 
 
@@ -280,4 +281,7 @@ defaults() ->
 %% ----------------------        ------------------------------
 
 test() ->
-	?SWITCH:publish(notif, {high, "test now: "++[now()] }).
+	?SWITCH:publish(notif, {test, high, "test now: "++[now()] }).
+
+reload() ->
+	?SWITCH:publish(sys, reload).
