@@ -147,8 +147,8 @@ maybe_dolog(undefined, Severity, Msg, Params) ->
 
 
 
-log(Severity, Msg) ->
-	log(Severity, Msg, []).
+%log(Severity, Msg) ->
+%	log(Severity, Msg, []).
 
 log(Severity, Msg, Params) ->
 	?LOG:policed_log(Severity, Msg, Params).
