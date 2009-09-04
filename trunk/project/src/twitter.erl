@@ -72,7 +72,7 @@ get_busses() -> ?BUSSES.
 %%
 %% @spec start_link() -> {ok, Pid}
 start_link() ->
-	
+	%inets:start(),
 	Pid = spawn_link(?MODULE, loop, []),
 	register(?SERVER, Pid),
 	%Pid ! start,
