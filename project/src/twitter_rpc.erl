@@ -7,12 +7,13 @@
 %%
 %% MACROS
 %%
--define(SUPPORTED_CMDS, [getapiversion, reload, status, getstats, getparams, getcmds, getparamsdesc, getblacklist]).
+-define(SUPPORTED_CMDS, [getapiversion, reload, status, getcmds]).
 -define(API_VERSION, {1,0}).
--define(DEFAULTS,   twitter_defaults).
 -define(MNG,        twitter_mng).
 -define(SERVER,     twitter).
 -define(TIMEOUT,    1000).
+-define(SWITCH,     twitter_hwswitch).
+
 
 getcmds() ->
 	?SUPPORTED_CMDS.
@@ -35,38 +36,15 @@ handle_rpc(ReplyTo, _FromNode, RC, getcmds) ->
 %% Reloads the configuration from file
 %%
 handle_rpc(ReplyTo, _FromNode, RC, reload) ->
-	Result=?MNG:load_config(),
+	Result=?SWITCH:publish(sys, reload),
 	rpc_reply(ReplyTo, {RC, Result});
 
-%% Retrieves the statistics
-%%
-handle_rpc(ReplyTo, _FromNode, RC, getstats) ->
-	Stats=?MNG:get_stats(),
-	rpc_reply(ReplyTo, {RC, Stats});
-
-%% Retrieves the parameters currently in-force
-%%
-handle_rpc(ReplyTo, _FromNode, RC, getparams) ->
-	Params=?MNG:get_dicparams(),
-	rpc_reply(ReplyTo, {RC, Params});
 
 %% Retrieves the API version
 %%
 handle_rpc(ReplyTo, _FromNode, RC, getapiversion) ->
 	rpc_reply(ReplyTo, {RC, ?API_VERSION});
 
-%% Retrieves the help information for all
-%% configurable parameters of the daemon
-%%
-handle_rpc(ReplyTo, _FromNode, RC, getparamsdesc) ->
-	Descs=?DEFAULTS:descriptions(),
-	rpc_reply(ReplyTo, {RC, Descs});
-
-%% Returns the list of blacklisted parameters
-%%
-handle_rpc(ReplyTo, _FromNode, RC, getblacklist) ->
-	Descs=?DEFAULTS:blacklist(),
-	rpc_reply(ReplyTo, {RC, Descs});
 
 
 

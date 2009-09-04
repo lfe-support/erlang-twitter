@@ -146,7 +146,7 @@ loop() ->
 			handle({hwswitch, From, Bus, Msg});
 	
 		Other ->
-			log(warning, "snoop: unexpected message: ", [Other])
+			log(warning, "snooper: unexpected message: ", [Other])
 	end,
 	loop().
 
@@ -170,25 +170,24 @@ inbox({FromNode, Server, Bus, Message}) ->
 
 %% @doc Translate mswitch 'notif' born messages
 %%		to the internal switch format.
-handle({mswitch, _From, notif, {Importance, Msg}}) ->
+handle({mswitch, _From, notif, {Context, Importance, Msg}}) ->
 	State=get_state(),
-	cond_forward(State, Importance, Msg);
+	cond_forward(State, Context, Importance, Msg);
 
 handle({mswitch, _From, notif, Other}) ->
 	log(debug, "snooper: unsupported msg on notif bus: ", [Other]);
 
 
+
+
 handle({hwswitch, _From, sys, {config, VersionInForce}}) ->
 	?CTOOLS:do_config(?SWITCH, ?SERVER, VersionInForce);
 
-handle({hwswitch, _From, sys, suspend}) ->
-	set_state(suspended);
+handle({hwswitch, _From, sys, suspend}) ->	set_state(suspended);
+handle({hwswitch, _From, sys, resume}) ->	set_state(working);
+handle({hwswitch, _From, sys, _}) -> not_supported;
 
-handle({hwswitch, _From, sys, resume}) ->
-	set_state(working);
 
-handle({hwswitch, _From, sys, _}) ->
-	not_supported;
 
 handle({hwswitch, _From, clock, {tick.min, _Count}}) ->
 	?CTOOLS:do_publish_config_version(?SWITCH, ?SERVER);
@@ -206,18 +205,18 @@ handle(Other) ->
 
 
 
-cond_forward(working, Importance, Msg) ->
+cond_forward(working, Context, Importance, Msg) ->
 	BlockState=get(snooper.output.block),
-	maybe_publish(BlockState, Importance, Msg);
+	maybe_publish(BlockState, Context, Importance, Msg);
 
-cond_forward(_, _, _Msg) ->
+cond_forward(_, _, _, _Msg) ->
 	ok.
 
 
-maybe_publish(false, Importance, Msg) ->
-	?SWITCH:publish(notif, {Importance, Msg});
+maybe_publish(false, Context, Importance, Msg) ->
+	?SWITCH:publish(notif, {Context, Importance, Msg});
 
-maybe_publish(_, _, _) ->
+maybe_publish(_, _, _, _) ->
 	blocked.
 
 

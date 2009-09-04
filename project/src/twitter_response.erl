@@ -22,7 +22,7 @@ process(Response) ->
 	process_body(Body).
 
 process_body(Body) ->
-	io:format("body: ~p~n",[Body]),
+	%io:format("body: ~p~n",[Body]),
 	try
 		{elements, Elements}=?XML:process(Body),
 		extract_name_value_pairs(Elements)
@@ -51,7 +51,7 @@ extract_name_value_pairs(Elements) ->
 
 do_extract_name_value_pairs([], Acc) -> Acc;
 do_extract_name_value_pairs([Element|Elements], Acc) ->
-	io:format("do_extract: Element<~p>~n", [Element]),
+	%io:format("do_extract: Element<~p>~n", [Element]),
 	Name =?XML:get_element_name(Element),
 	Value=?XML:get_element_value(Element),
 	NewAcc=maybe_add_pair(Acc, Name, Value),
