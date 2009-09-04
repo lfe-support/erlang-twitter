@@ -188,7 +188,7 @@ hpublish([], _From, _Bus, _Msg) ->
 	no_subscribers;
 
 hpublish(Subs, From, Bus, Msg) ->
-	%io:format("hpublish: bus[~p] msg[~p]~n",[Bus, Msg]),
+	io:format("hpublish: bus[~p] msg[~p]~n",[Bus, Msg]),
 	Result=kfind(Bus, Subs),
 	maybe_publish(Result, From, Bus, Msg).
 

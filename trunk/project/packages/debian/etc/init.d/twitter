@@ -1,0 +1,165 @@
+#!/usr/bin/env python
+### BEGIN INIT INFO
+# Provides:          etwitter
+# Required-Start:    
+# Required-Stop:     
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: Start daemon at boot time
+# Description:       Enable service provided by daemon.
+### END INIT INFO
+"""
+	Erlang-twitter daemon control
+	
+	@author Jean-Lou Dupont
+"""
+
+# Customize here
+name="twitter"
+# ^^^^^^^^^^^^^^
+
+
+import os
+import sys
+import subprocess
+from optparse import OptionParser
+
+class Commands(object):
+	
+	cmdStart  = "erl -pa %(cmd)s -detached -sname %(name)s -run %(name)s_app start"
+	
+	#probably need to put the "escript" for development purpose...
+	#windows shared drive do not play well with file mod flags...
+	cmdStop   = "%s_control -q stop"
+	cmdStatus = "%s_control -q status"
+	
+	dostart  = "starting daemon"
+	nodaemon = "cannot start daemon"
+	nostop   = "cannot stop daemon"
+	canstop  = "ok"
+	
+	# "status" field according to LSB-Core-generic specification
+	
+	codes = {	0: {"msg":"ok",                "canstart": True,  "stop":canstop, "start":dostart,  "status":4  },
+				1: {"msg":"unspecified error", "canstart": True,  "stop":nostop,  "start":dostart,  "status":4  }, 
+				2: {"msg":"daemon found",      "canstart": False, "stop":nostop,  "start":nodaemon, "status":0 }, 
+				3: {"msg":"daemon not found",  "canstart": True,  "stop":nostop,  "start":dostart,  "status":3  }, 
+				4: {"msg":"library not found", "canstart": False, "stop":nostop,  "start":nodaemon, "status":4 },
+				5: {"msg":"node not found",    "canstart": True,  "stop":nostop,  "start":dostart,  "status":4  },
+			}
+	
+	def __init__(self, feedback=True, verbose=False):
+		self.name = globals()["name"]
+		self.verbose = verbose
+		self.feedback=feedback
+	
+	def cmd_start(self):
+		ctx=self._canStart()
+		self._msg(ctx, "start")
+
+		if not ctx["canstart"]:
+			sys.exit(1)
+
+		self._dostart()
+		sys.exit(0)	
+		
+	def cmd_stop(self):
+		ctx=self._dostop()
+		self._msg(ctx, "stop")
+		
+	
+	def cmd_restart(self):
+		self.cmd_stop()
+		self.cmd_start()
+		
+	def cmd_reload(self):
+		if self.feedback:
+			print "%s: unimplemented feature\n" % self.name
+		sys.exit(3) #unimplemented feature (see LSBInitScript documentation)
+		
+	def cmd_status(self):
+		ctx=self._canStart()
+		if self.feedback:
+			print "%s: [%s]\n" % (self.name, ctx["msg"])
+		sys.exit(ctx["status"])
+
+	
+	def cmd_check(self):
+		pass
+	
+	
+	## =-----------------------------------------------------=- ##
+	
+	
+	def _msg(self, ctx, cmd):
+		if self.feedback:
+			if self.verbose:
+				print "%s: %s [%s]\n" % (name, ctx[cmd], ctx["msg"])
+			else:
+				print "%s: %s\n" % (name, ctx[cmd])
+	
+	
+	def _dostart(self):
+	
+		#add development path
+		cwd=os.getcwd()
+		params={"name":self.name, "cmd":cwd+"/ebin"}
+		cmd=self.cmdStart % params
+		proc = subprocess.Popen(cmd, shell=True)
+		return proc.wait()
+		
+	def _dostop(self):
+		proc = subprocess.Popen(self.cmdStop % self.name, shell=True)
+		proc.wait()
+		ret=proc.returncode
+		ctx=self._getCtx(ret)
+		return ctx
+
+	def _getCtx(self, code):
+		ctx=self.codes.get(code, self.codes[1])
+		return ctx			
+
+	def _canStart(self):
+		proc = subprocess.Popen(self.cmdStatus % self.name, shell=True)
+		proc.wait()
+		ret=proc.returncode
+		ctx=self._getCtx(ret)
+		return ctx
+		
+	
+
+def main():
+	usage= """%s [-q] [start|stop|status|check] 
+""" % name
+	
+	parser=OptionParser(usage)
+	parser.add_option("-v", "--verbose",
+                  action="store_true", dest="verbose", default=False,
+                  help="print additional information stdout")
+	
+	parser.add_option("-q", "--quiet",
+                  action="store_false", dest="feedback", default=True,
+                  help="don't print status messages to stdout")
+                  
+	(options, args) = parser.parse_args()
+    
+	if len(args) != 1:
+		parser.error("incorrect number of arguments")
+      
+	cmd = args[0]
+	feedback = options.feedback
+	verbose  = options.verbose
+	
+	try:
+		getattr(Commands(feedback, verbose), "cmd_"+cmd)()
+	except Exception, e:
+		#print "Exception [%s]\n" % e
+		print "! invalid command [%s]\n" % cmd
+
+	
+if __name__=="__main__":
+
+	# for our dev environment
+	PATH=os.getenv("PATH")
+	os.putenv("PATH", ".:"+PATH)
+	main()
