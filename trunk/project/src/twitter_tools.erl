@@ -108,6 +108,8 @@ gen_auth(Username, Password) ->
 	base64:encode_to_string(StringToEncode).
 	
 	
+url_encode(T) when is_tuple(T) ->
+	url_encode(tuple_to_string(T));
 
 %% From YAWS
 url_encode([H|T]) ->
@@ -118,19 +120,64 @@ url_encode([H|T]) ->
             [H|url_encode(T)];
         H >= $0, $9 >= H ->
             [H|url_encode(T)];
-        H == $_; H == $.; H == $-; H == $/; H == $: -> % FIXME: more..
+		
+        H == $_; H == $.; H == $-; H == $/;	H == $:; H == ${; H == $} -> % FIXME: more..
             [H|url_encode(T)];
+		
+		erlang:is_list(H) ->
+			url_encode(lists:flatten(H)++T);
+		
+		%%jld
+		is_tuple(H) ->
+			url_encode(handle_tuple(H)++T);
+		
         true ->
-            case tools:integer_to_hex(H) of
+            case integer_to_hex(H) of
                 [X, Y] ->
                     [$%, X, Y | url_encode(T)];
                 [X] ->
-                    [$%, $0, X | url_encode(T)]
+                    [$%, $0, X | url_encode(T)];
+				X ->
+					[$%, $0, X | url_encode(T)]
             end
      end;
 
 url_encode([]) ->
     [].
+
+tuple_to_string(T) ->
+	L=erlang:tuple_to_list(T),
+	"{"++L++"}".
+
+handle_tuple(T) ->
+	L=erlang:tuple_to_list(T),
+	L2=lists:flatten(L),
+	Acc=handle_tuple(L2, [], ""),
+	"{"++Acc++"}".
+	
+
+handle_tuple([], Acc, _) -> Acc;
+
+handle_tuple([I|T], Acc, Sep) when is_integer(I) ->
+	S=erlang:integer_to_list(I),
+	handle_tuple(T, Acc++Sep++S, ",");
+
+handle_tuple([F|T], Acc, Sep) when is_float(F) ->
+	S=erlang:float_to_list(F),
+	handle_tuple(T, Acc++Sep++S, ",");
+
+handle_tuple([A|T], Acc, Sep) when is_atom(A) ->
+	S=erlang:atom_to_list(A),
+	handle_tuple(T, Acc++Sep++S, ",");
+
+handle_tuple(Other, Acc, _) ->
+	io:format("handle_tuple: error[~p]~n", [Other]),
+	Acc.
+
+
+	
+
+
 
 
 %% From YAWS
