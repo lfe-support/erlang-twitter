@@ -270,7 +270,5 @@ defaults() ->
 	 %% prepare for possible 'load balancing'
 	 {twitter.account1.user, mandatory, nstring,  ""}
 	,{twitter.account1.pass, mandatory, nstring,  ""}
-	
-	,{twitter.simulate,      optional,  atom,     false}
 	 ].
 
