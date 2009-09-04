@@ -213,12 +213,12 @@ maybe_send_update(_, _From, _Priority, _Message, Other) ->
 
 report_error(ReturnDetails, Reason) ->
 	{Aid, _Req} = ReturnDetails,
-	log({twitter.updater,request, Aid}, error, "status: request to Twitter failed, {AccountId, Reason}: ", [[Aid, Reason]]).
+	log({twitter.updater,request, Aid}, error, "updater: request to Twitter failed, {AccountId, Reason}: ", [[Aid, Reason]]).
 
 
 process_result({Aid, _}, Result) ->
 	PrResult=?REP:process(Result),
-	%io:format("status: reply: ~p~n", [PrResult]),
+	io:format("updater: reply: ~p~n", [PrResult]),
 	maybe_publish_result(Aid, PrResult);
 
 process_result(Rd, _) ->
@@ -229,7 +229,7 @@ maybe_publish_result(_Aid, {error, _}) ->	error;
 
 maybe_publish_result(Aid, PrResult) ->
 	AccountName=get_account_name(Aid),
-	%io:format("updater: publish_result: aid[~p] result:~p~n", [Aid, PrResult]),
+	io:format("updater: publish_result: aid[~p] result:~p~n", [Aid, PrResult]),
 	?SWITCH:publish(tweet, {echo, {update, Aid, AccountName, PrResult}}).
 
 
