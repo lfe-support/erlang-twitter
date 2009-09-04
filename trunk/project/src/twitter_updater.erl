@@ -104,7 +104,6 @@ loop() ->
 		%%%%%%%%%%% REPLY FROM TWITTER API %%%%%%%%%%%%%%%%%%%
 		%%%%%%%%%%%                        %%%%%%%%%%%%%%%%%%%
 		
-		
 		{http, {RequestId, {error, Reason}}} ->
 			ReturnDetails=get({requestid, RequestId}),
 			erase({requestid, RequestId}),
@@ -163,8 +162,8 @@ handle({hwswitch, _From, clock, _}) ->
 %%%%%%%%%%%%%% NOTIF bus
 %-----------------------
 
-handle({hwswitch, From, notif, {Priority, Message} }) ->
-	hnotif(From, Priority, Message);
+handle({hwswitch, From, notif, {Context, Priority, Message} }) ->
+	hnotif(From, Context, Priority, Message);
 
 handle({hwswitch, _From, notif, _ }) ->
 	unsupported;
@@ -186,7 +185,7 @@ handle({hwswitch, _From, tweet, _}) ->
 %-----------------------
 
 handle(Other) ->
-	log(warning, "snooper: unexpected message: ", [Other]).
+	log(warning, "updater: unexpected message: ", [Other]).
 
 
 
@@ -194,7 +193,7 @@ handle(Other) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%  DOERS  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% ----------------------         ------------------------------
 
-hnotif(From, Priority, Message) ->
+hnotif(From, _Context, Priority, Message) ->
 	Account=pick_account(),
 	State=get_state(),
 	maybe_send_update(State, From, Priority, Message, Account).
@@ -218,7 +217,6 @@ report_error(ReturnDetails, Reason) ->
 
 process_result({Aid, _}, Result) ->
 	PrResult=?REP:process(Result),
-	io:format("updater: reply: ~p~n", [PrResult]),
 	maybe_publish_result(Aid, PrResult);
 
 process_result(Rd, _) ->
@@ -228,8 +226,8 @@ process_result(Rd, _) ->
 maybe_publish_result(_Aid, {error, _}) ->	error;
 
 maybe_publish_result(Aid, PrResult) ->
+	%io:format("updater: publish_result: aid[~p] result:~p~n", [Aid, PrResult]),	
 	AccountName=get_account_name(Aid),
-	io:format("updater: publish_result: aid[~p] result:~p~n", [Aid, PrResult]),
 	?SWITCH:publish(tweet, {echo, {update, Aid, AccountName, PrResult}}).
 
 
@@ -238,8 +236,7 @@ get_account_name(Aid) ->
 	Accounts=get(accounts),
 	Entry=?TOOLS:kfind(Aid, Accounts),
 	case Entry of
-		{_Aid, Username, _Password} ->
-			Username;
+		{_Aid, Username, _Password} ->	Username;
 		_ -> undefined
 	end.
 
@@ -249,8 +246,7 @@ pick_account() ->
 	Accounts=get(accounts),
 	Entry=?TOOLS:kfind(1, Accounts),
 	case Entry of
-		{Aid, Username, Password} ->
-			{Aid, Username, Password};
+		{Aid, Username, Password} ->{Aid, Username, Password};
 		_ -> undefined
 	end.
 	
