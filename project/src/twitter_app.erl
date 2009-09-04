@@ -178,9 +178,8 @@ check() ->
 do_check(_, undefined, _, _) ->
 	config_not_started;
 
-do_check(_, _VersionInForce, X, X) ->
-	clog(app.ready, info, "application ready"),
-	?SWITCH:publish(sys, app.ready);
+do_check(_, VersionInForce, X, X) ->
+	maybe_send_app_ready(VersionInForce);
 
 do_check([], _, _, _Count) ->
 	%io:format("APP NOT READY, count[~p]~n", Count),
@@ -197,6 +196,23 @@ do_check([Module|Modules], VersionInForce, ModulesCount, CurrentCount) ->
 	do_check(Modules, VersionInForce, ModulesCount, NewCount).
 
 
+maybe_send_app_ready(VersionInForce) ->
+	Adv=get(config.advertised),
+	maybe_send_app_ready(VersionInForce, Adv).
+
+
+maybe_send_app_ready(undefined, undefined) ->
+	not_ready;
+
+maybe_send_app_ready(X, X) ->
+	already_advertised;
+
+
+maybe_send_app_ready(V,_) ->
+	put(config.advertised, V),
+	clog(app.ready, info, "application ready"),
+	?SWITCH:publish(sys, app.ready).
+	
 
 
 %% ----------------------          ------------------------------
