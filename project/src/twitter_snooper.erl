@@ -130,8 +130,7 @@ loop() ->
 			exit(normal);
 	
 		{config, Version, Config} ->
-			put(config.version, Version),
-			?CTOOLS:put_config(Config);
+			?CTOOLS:put_config(Version, Config);
 		
 		
 		%%% MSWITCH RELATED %%%

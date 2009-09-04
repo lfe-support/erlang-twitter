@@ -134,7 +134,7 @@ loop() ->
 
 report_error(ReturnDetails, Reason) ->
 	{Aid, _Req} = ReturnDetails,
-	log({twitter.status,request, Aid}, error, "status: request to Twitter failed, {AccountId, Reason}: ", [[Aid, Reason]]).
+	log({twitter.status, request, Aid}, error, "status: request to Twitter failed, {AccountId, Reason}: ", [[Aid, Reason]]).
 
 
 process_result({Aid, _}, Result) ->
@@ -236,21 +236,6 @@ sync1(Other) ->
 
 
 
-% request(Rd, TO, Auth, account.rate_limit_status, [], [])
-do_status(Aid) ->
-	Ad=get({account, Aid}),
-	do_status(Aid, Ad).
-
-do_status(Aid, {User, Pass}) ->
-	Rd={Aid, 'account.rate_limit_status'},
-	?API:request(Rd, ?TIMEOUT, {auth, User, Pass}, account.rate_limit_status, [], []);
-
-
-do_status(Aid, Other) ->
-	log(critical, "status: invalid account details {AccountId, Details} ", [Aid, Other]).
-
-
-
 
 
 manage_timer(Aid) ->
@@ -274,6 +259,27 @@ get_poll() ->
 
 
 
+% request(Rd, TO, Auth, account.rate_limit_status, [], [])
+do_status(Aid) ->
+	Ad=get({account, Aid}),
+	do_status(Aid, Ad).
+
+do_status(Aid, {User, Pass}) ->
+	maybe_do_status(Aid, User, Pass);
+
+do_status(Aid, Other) ->
+	log(critical, "status: invalid account details {AccountId, Details} ", [Aid, Other]).
+
+
+maybe_do_status(Aid, User, Pass) ->
+	maybe_do_status(get_state(), Aid, User, Pass).
+
+maybe_do_status(working, Aid, User, Pass) ->
+	Rd={Aid, 'account.rate_limit_status'},
+	?API:request(Rd, ?TIMEOUT, {auth, User, Pass}, account.rate_limit_status, [], []);
+	
+maybe_do_status(_, _Aid, _User, _Pass) ->
+	suspended.
 
 
 %% ----------------------          ------------------------------
@@ -282,13 +288,13 @@ get_poll() ->
 set_state(State) ->
 	put(state, State).
 
-%get_state() ->
-%	State=get(state),
-%	case State of
-%		undefined -> working;   %start in 'working' state
-%		working   -> working;
-%		_         -> suspended
-%	end.
+get_state() ->
+	State=get(state),
+	case State of
+		undefined -> working;   %start in 'working' state
+		working   -> working;
+		_         -> suspended
+	end.
 
 
 %% ----------------------          ------------------------------
