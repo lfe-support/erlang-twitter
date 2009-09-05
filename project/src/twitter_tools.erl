@@ -254,6 +254,7 @@ encode_list() ->
 	Test=["param1", "param2", "param?", {"key", "value"}],
 	encode_list(Test).
 
+
 encode_list([]) ->
 	"";
 
