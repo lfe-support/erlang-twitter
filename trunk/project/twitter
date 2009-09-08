@@ -32,6 +32,7 @@ class Commands(object):
 	#windows shared drive do not play well with file mod flags...
 	cmdStop   = "%s_control -q stop"
 	cmdStatus = "%s_control -q status"
+	cmdReload = "%s_control -q reload"
 	
 	dostart  = "starting daemon"
 	nodaemon = "cannot start daemon"
@@ -110,6 +111,13 @@ class Commands(object):
 		
 	def _dostop(self):
 		proc = subprocess.Popen(self.cmdStop % self.name, shell=True)
+		proc.wait()
+		ret=proc.returncode
+		ctx=self._getCtx(ret)
+		return ctx
+
+	def _doreload(self):
+		proc = subprocess.Popen(self.cmdReload % self.name, shell=True)
 		proc.wait()
 		ret=proc.returncode
 		ctx=self._getCtx(ret)

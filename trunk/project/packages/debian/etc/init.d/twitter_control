@@ -10,7 +10,7 @@ name()  -> "twitter".
 nnode() -> "twitter".
 %% ^^^^^^^^^^^^^^^^^
 
-cmds() -> "[status|stop|getcmds]".
+cmds() -> "[status|stop|reload|getcmds]".
 
 code_ok()               -> 0.
 code_error()            -> 1.
