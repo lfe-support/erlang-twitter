@@ -43,7 +43,7 @@ class Commands(object):
 	
 	codes = {	0: {"msg":"ok",                "canstart": True,  "stop":canstop, "start":dostart,  "status":4  },
 				1: {"msg":"unspecified error", "canstart": True,  "stop":nostop,  "start":dostart,  "status":4  }, 
-				2: {"msg":"daemon found",      "canstart": False, "stop":nostop,  "start":nodaemon, "status":0 }, 
+				2: {"msg":"daemon found",      "canstart": False, "stop":canstop, "start":nodaemon, "status":0 }, 
 				3: {"msg":"daemon not found",  "canstart": True,  "stop":nostop,  "start":dostart,  "status":3  }, 
 				4: {"msg":"library not found", "canstart": False, "stop":nostop,  "start":nodaemon, "status":4 },
 				5: {"msg":"node not found",    "canstart": True,  "stop":nostop,  "start":dostart,  "status":4  },
@@ -74,9 +74,10 @@ class Commands(object):
 		self.cmd_start()
 		
 	def cmd_reload(self):
+		ctx=self.doreload()
 		if self.feedback:
-			print "%s: unimplemented feature\n" % self.name
-		sys.exit(3) #unimplemented feature (see LSBInitScript documentation)
+			print "%s: [%s]\n" % (self.name, ctx["msg"])
+		sys.exit(ctx["status"])
 		
 	def cmd_status(self):
 		ctx=self._canStart()
