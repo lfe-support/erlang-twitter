@@ -3,7 +3,7 @@ Version: $version
 Priority: optional
 Architecture: all
 Section: Other
-Depends: erlang-mswitch (>= 2.00)
+Depends: erlang-mswitch (>= 2.1)
 Maintainer: Jean-Lou Dupont <erlang@jldupont.com>
 Description: Erlang Twitter client library
  .
