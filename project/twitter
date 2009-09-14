@@ -39,6 +39,8 @@ class Commands(object):
 	nostop   = "cannot stop daemon"
 	canstop  = "ok"
 	
+	environ = {"HOME":"/root", "PATH":"/sbin:/usr/sbin:/bin:/usr/bin" }
+	
 	# "status" field according to LSB-Core-generic specification
 	
 	codes = {	0: {"msg":"ok",                "canstart": True,  "stop":canstop, "start":dostart,  "status":4  },
@@ -107,18 +109,18 @@ class Commands(object):
 		cwd=os.getcwd()
 		params={"name":self.name, "cmd":cwd+"/ebin"}
 		cmd=self.cmdStart % params
-		proc = subprocess.Popen(cmd, shell=True)
+		proc = subprocess.Popen(cmd, shell=True, env=self.environ)
 		return proc.wait()
 		
 	def _dostop(self):
-		proc = subprocess.Popen(self.cmdStop % self.name, shell=True)
+		proc = subprocess.Popen(self.cmdStop % self.name, shell=True, env=self.environ)
 		proc.wait()
 		ret=proc.returncode
 		ctx=self._getCtx(ret)
 		return ctx
 
 	def _doreload(self):
-		proc = subprocess.Popen(self.cmdReload % self.name, shell=True)
+		proc = subprocess.Popen(self.cmdReload % self.name, shell=True, env=self.environ)
 		proc.wait()
 		ret=proc.returncode
 		ctx=self._getCtx(ret)
@@ -129,7 +131,7 @@ class Commands(object):
 		return ctx			
 
 	def _canStart(self):
-		proc = subprocess.Popen(self.cmdStatus % self.name, shell=True)
+		proc = subprocess.Popen(self.cmdStatus % self.name, shell=True, env=self.environ)
 		proc.wait()
 		ret=proc.returncode
 		ctx=self._getCtx(ret)
