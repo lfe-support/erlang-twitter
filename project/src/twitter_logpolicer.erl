@@ -100,7 +100,7 @@ handle({hwswitch, _From, log, {Context, {Severity, Msg, Params}}}) ->
 	
 
 handle(Other) ->
-	log(warning, "status: Unexpected message: ", [Other]).
+	log(warning, "logpolicer: Unexpected message: ", [Other]).
 
 
 
